@@ -1,0 +1,85 @@
+# ============================================================
+#  TornadoTracker — Automated Data Pipeline
+#  .github/workflows/fetch-tornado-data.yml
+#
+#  What it does:
+#    1. Runs on a weekly cron schedule (every Monday 06:00 UTC)
+#    2. Can also be triggered manually from the Actions tab
+#    3. Runs scripts/fetch_tornadoes.py to pull the NOAA SPC
+#       tornado CSV and convert it to tornadoes.geojson
+#    4. Commits & pushes the updated GeoJSON back to the repo
+#    5. If nothing changed, no commit is made (idempotent)
+#
+#  No API keys or secrets required — NOAA data is public.
+# ============================================================
+
+name: Fetch Tornado Data
+
+on:
+  # ── Scheduled run — every Monday at 06:00 UTC ──────────────
+  schedule:
+    - cron: "0 6 * * 1"
+
+  # ── Manual trigger from the GitHub Actions UI ──────────────
+  workflow_dispatch:
+    inputs:
+      start_year:
+        description: "Earliest year to include (default: 2000). Use 0 for all data since 1950."
+        required: false
+        default: "2000"
+
+jobs:
+  fetch-and-commit:
+    name: Fetch NOAA SPC data → tornadoes.geojson
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write   # needed to push the updated GeoJSON
+
+    steps:
+      # ── 1. Check out the repo ─────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1   # shallow clone is enough
+
+      # ── 2. Set up Python ──────────────────────────────────
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      # ── 3. Override START_YEAR if manually dispatched ─────
+      - name: Apply manual year override (if dispatched)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          YEAR="${{ github.event.inputs.start_year }}"
+          if [ -n "$YEAR" ]; then
+            # Patch the constant in the script inline
+            sed -i "s/^START_YEAR = .*/START_YEAR = ${YEAR}/" scripts/fetch_tornadoes.py
+            echo "START_YEAR overridden to ${YEAR}"
+          fi
+
+      # ── 4. Run the fetch + conversion script ──────────────
+      - name: Fetch NOAA SPC CSV and convert to GeoJSON
+        run: python scripts/fetch_tornadoes.py
+
+      # ── 5. Commit the result (only if the file changed) ───
+      - name: Commit updated tornadoes.geojson
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add tornadoes.geojson
+
+          # Only commit if there's actually a diff
+          if git diff --staged --quiet; then
+            echo "No changes detected — tornadoes.geojson is already up to date."
+          else
+            TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
+            RECORDS=$(python -c "import json; d=json.load(open('tornadoes.geojson')); print(d['metadata']['record_count'])")
+            git commit -m "chore(data): auto-update tornado data [${TIMESTAMP}] — ${RECORDS} records"
+            git push
+            echo "Pushed updated tornadoes.geojson (${RECORDS} records)"
+          fi
