@@ -48,7 +48,6 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
-          cache: "pip"
 
       # ── 3. Override START_YEAR if manually dispatched ─────
       - name: Apply manual year override (if dispatched)
