@@ -101,11 +101,20 @@ var map           // Leaflet map instance
 var tornadoLayer  // Leaflet GeoJSON layer (null = not yet loaded)
 var activeFeature // Currently selected Leaflet layer (null = nothing selected)
 var allFeatures   // Array of all GeoJSON features
+var outbreakDates // Object keyed by date string → true (outbreak days)
 
 // Filters
-var filterMonth   // 'all' | '1'..'12'
-var filterDay     // 0 (any) | 1..31
-var filterEF      // -1 (all) | 0..5 (minimum rating)
+var filterMonth    // 'all' | '1'..'12'
+var filterDay      // 0 (any) | 1..31
+var filterEF       // -1 (all) | 0..5 (minimum rating)
+var filterYearMin  // number — lower bound of year range (default: dataset min)
+var filterYearMax  // number — upper bound of year range (default: dataset max)
+var filterState    // 'all' | two-letter state code e.g. 'KS'
+var filterCasualty // 0 (any) | 1..50+ — min fat+inj combined
+
+// Data / year range derived from loaded data
+var dataYearMin   // number — smallest year in current dataset
+var dataYearMax   // number — largest year in current dataset
 
 // Data cache
 var GEOJSON_URL   // './tornadoes.geojson'
@@ -148,22 +157,35 @@ URL pattern: `https://www.spc.noaa.gov/wcm/data/1950-{YEAR}_actual_tornadoes.csv
 
 ### Header (`#header`)
 - Brand logo + title + tagline
-- Stat pills: Visible count, Total, Fatalities, Updated date
-- Refresh button (`#btn-refresh`) — clears cache and re-fetches
+- Stat pills — all clickable:
+  - **Visible** — count of currently shown tracks
+  - **Total** — click to fit map to all visible tracks
+  - **Fatalities** (`#pill-fatal`) — click to jump to deadliest visible tornado
+  - **Outbreaks** (`#pill-outbreaks`) — hidden until ≥1 outbreak day; click to fit map to outbreak tracks
+  - **Updated** — date from `metadata.generated`
+- Refresh button (`#btn-refresh`) — clears localStorage cache and re-fetches
 
 ### Sidebar (`#sidebar`)
-- **Filters section:** Month dropdown, Day slider (0=any, 1-31), EF minimum dropdown
-- **Apply / Reset buttons**
-- **EF Legend section:** 6 color swatches built by `buildLegend()`
-- **Track Detail section:** Shows `#detail-placeholder` or `#detail-card` after click
+- **Filters section:**
+  - Year range — dual `<input type=range>` slider; bounds populated from loaded data via `buildYearSlider()`
+  - Month dropdown
+  - Day of Month slider (0=any, 1-31)
+  - State dropdown — populated from loaded data via `buildStateDropdown()`
+  - Min EF rating dropdown
+  - Casualty threshold slider (fat+inj, 0=any, 1-50+)
+  - **Apply** + **📍 Fit** buttons; **Reset All** button
+- **EF Legend section:** 6 color swatches built by `buildLegend()`; note about proportional width
+- **EF Breakdown Chart section:** 6 horizontal bar rows, one per EF rating; updated by `updateEFChart()` on every filter apply
+- **Track Detail section:** Shows `#detail-placeholder` or `#detail-card` after track click
 
 ### Map (`#map`)
 - CartoDB Dark Matter tiles
-- Leaflet GeoJSON layer with EF-colored polylines
-- Custom dark-styled popups on click
+- Leaflet GeoJSON layer with EF-colored polylines; **line weight is proportional to tornado path width in yards** (min 2px, max 12px)
+- Tracks on outbreak days get a CSS `outbreak-track` class → pulsing red drop-shadow glow
+- Custom dark-styled popups on click; popup shows 🚨 badge if date is an outbreak day
 
 ### Loading Overlay (`#loading-overlay`)
-- Full-screen with spinner + status text
+- Full-screen with spinner + status text + sub-text (URL or fallback message)
 - Hidden with `.hidden` CSS class (opacity → 0)
 
 ---
@@ -209,12 +231,36 @@ The workflow:
 
 ---
 
+## Key Functions Added in Enhancement Pass
+
+| Function | Purpose |
+|----------|---------|
+| `trackWeight(width_yd)` | Maps 0–3000 yd → 2–12 px line weight |
+| `buildYearSlider(min, max)` | Sets dual-range slider bounds from data |
+| `updateYearFill()` | Redraws the filled track between year thumbs |
+| `buildStateDropdown(features)` | Populates state `<select>` from data (alphabetical, deduped) |
+| `buildEFChart()` | Creates 6-row horizontal bar chart DOM |
+| `updateEFChart(counts, total)` | Animates bar widths after each filter apply |
+| `markOutbreaks(visibleLayers)` | Groups visible tracks by date; flags dates with ≥5 as outbreaks; applies `.outbreak-track` CSS class; updates pill |
+| `fitVisibleBounds()` | Collects bounds of visible layers; calls `map.fitBounds()` |
+| `jumpToDeadliest()` | Finds visible layer with highest `fat`; flies to it and selects it |
+
+---
+
 ## Testing Checklist
 
 When making changes to `index.html`, verify:
-- [ ] Filters (month, day, EF) correctly show/hide tracks
-- [ ] Clicking a track opens both the popup and the sidebar detail panel
-- [ ] Reset button restores all tracks and clears the detail panel
+- [ ] Year slider: thumbs initialize to dataset min/max from loaded data; cannot cross each other
+- [ ] State dropdown: populated from real data, alphabetically sorted, no duplicates
+- [ ] Filters (year, month, day, state, EF, casualty) correctly show/hide tracks
+- [ ] EF chart bars update immediately on Apply; counts match visible tracks per rating
+- [ ] Outbreak glow: tracks on the same day as ≥5 others pulse with red drop-shadow
+- [ ] Outbreak pill: appears in header when outbreaks exist; click fits map to outbreak tracks
+- [ ] Fit (📍) button zooms map to only the currently visible tracks
+- [ ] Fatalities pill click flies to deadliest visible tornado and selects it
+- [ ] Proportional width: wide tornado paths visually thicker than narrow ones
+- [ ] Clicking a track opens popup + sidebar detail; popup shows 🚨 on outbreak days
+- [ ] Reset button restores all controls, re-fits map, clears detail panel
 - [ ] Refresh (⟳) button clears localStorage and re-fetches data
 - [ ] Loading overlay disappears after data renders
 - [ ] "Updated" stat pill shows the correct date from `metadata.generated`

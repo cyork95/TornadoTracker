@@ -4,49 +4,36 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>TornadoTracker — Historical Tornado Path Explorer | yorkdevelops.com</title>
-  <meta name="description" content="Explore historical tornado tracks across the United States. Filter by month and day, compare EF-scale ratings, and analyze historical storm patterns interactively." />
+  <meta name="description" content="Explore historical tornado tracks across the United States. Filter by year, month, day, state, and EF scale. Analyze historical storm patterns interactively." />
   <meta name="keywords" content="tornado tracker, tornado map, EF scale, storm history, GIS map, tornado paths, tornado data visualization" />
   <meta property="og:title" content="TornadoTracker — Historical Tornado Path Explorer" />
-  <meta property="og:description" content="Interactive map of historical US tornado tracks with EF-scale rating, date filtering, and detailed storm data." />
+  <meta property="og:description" content="Interactive map of historical US tornado tracks with EF-scale rating, year/date/state filtering, and detailed storm data." />
   <meta property="og:type" content="website" />
 
-  <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-  <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <style>
     /* ============================================================
-       CSS CUSTOM PROPERTIES — Design Tokens
+       DESIGN TOKENS
     ============================================================ */
     :root {
-      --bg-darkest:   #070b14;
-      --bg-dark:      #0d1526;
-      --bg-card:      rgba(15, 25, 50, 0.82);
-      --bg-card-hover:rgba(20, 35, 68, 0.92);
-      --border-subtle:rgba(99, 148, 255, 0.14);
-      --border-glow:  rgba(99, 148, 255, 0.38);
-      --accent-blue:  #4f90ff;
-      --accent-cyan:  #00d4ff;
-      --text-primary: #e8eeff;
-      --text-muted:   #8898bb;
-      --text-dim:     #4a5a7a;
-
-      /* EF Scale palette */
-      --ef0: #f5e642;
-      --ef1: #f5a623;
-      --ef2: #f56e20;
-      --ef3: #e8341c;
-      --ef4: #a81dd8;
-      --ef5: #5c0ab0;
-
-      --radius-sm: 8px;
-      --radius-md: 14px;
-      --radius-lg: 20px;
-      --shadow-panel: 0 8px 40px rgba(0,0,0,0.7), 0 0 0 1px rgba(99,148,255,0.1);
+      --bg-darkest:    #070b14;
+      --bg-dark:       #0d1526;
+      --bg-card:       rgba(15, 25, 50, 0.82);
+      --bg-card-hover: rgba(20, 35, 68, 0.92);
+      --border-subtle: rgba(99, 148, 255, 0.14);
+      --border-glow:   rgba(99, 148, 255, 0.38);
+      --accent-blue:   #4f90ff;
+      --accent-cyan:   #00d4ff;
+      --text-primary:  #e8eeff;
+      --text-muted:    #8898bb;
+      --text-dim:      #4a5a7a;
+      --ef0: #f5e642; --ef1: #f5a623; --ef2: #f56e20;
+      --ef3: #e8341c; --ef4: #a81dd8; --ef5: #5c0ab0;
+      --radius-sm: 8px; --radius-md: 14px; --radius-lg: 20px;
       --transition: all 0.22s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
@@ -54,794 +41,308 @@
        RESET & BASE
     ============================================================ */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html, body {
-      height: 100%;
-      font-family: 'Inter', sans-serif;
-      background: var(--bg-darkest);
-      color: var(--text-primary);
-      overflow: hidden;
-    }
+    html, body { height: 100%; font-family: 'Inter', sans-serif; background: var(--bg-darkest); color: var(--text-primary); overflow: hidden; }
 
     /* ============================================================
        LAYOUT
     ============================================================ */
-    #app {
-      display: flex;
-      flex-direction: column;
-      height: 100vh;
-      width: 100vw;
-    }
+    #app { display: flex; flex-direction: column; height: 100vh; width: 100vw; }
 
-    /* ── Top header bar ── */
     #header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 20px;
-      height: 54px;
-      background: rgba(7, 11, 20, 0.96);
-      border-bottom: 1px solid var(--border-subtle);
-      backdrop-filter: blur(12px);
-      z-index: 1100;
-      flex-shrink: 0;
-      gap: 16px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 20px; height: 54px;
+      background: rgba(7, 11, 20, 0.96); border-bottom: 1px solid var(--border-subtle);
+      backdrop-filter: blur(12px); z-index: 1100; flex-shrink: 0; gap: 12px;
     }
 
-    #header-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      flex-shrink: 0;
-    }
-
+    #header-brand { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
     #header-brand .logo-icon {
-      width: 32px;
-      height: 32px;
+      width: 32px; height: 32px; border-radius: 8px; display: flex;
+      align-items: center; justify-content: center; font-size: 17px;
       background: linear-gradient(135deg, var(--ef3), var(--ef5));
-      border-radius: 8px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 17px;
     }
-
     #header-brand h1 {
-      font-size: 1rem;
-      font-weight: 700;
-      letter-spacing: -0.02em;
+      font-size: 1rem; font-weight: 700; letter-spacing: -0.02em;
       background: linear-gradient(90deg, #fff 30%, var(--accent-cyan));
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      background-clip: text;
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
     }
+    #header-brand .tagline { font-size: 0.68rem; color: var(--text-dim); display: none; }
+    @media (min-width: 640px) { #header-brand .tagline { display: block; } }
 
-    #header-brand .tagline {
-      font-size: 0.68rem;
-      color: var(--text-dim);
-      font-weight: 400;
-      letter-spacing: 0.04em;
-      display: none;
-    }
-
-    @media (min-width: 640px) {
-      #header-brand .tagline { display: block; }
-    }
-
-    /* Stats pills in header */
-    #header-stats {
-      display: flex;
-      gap: 8px;
-      align-items: center;
-      flex-shrink: 0;
-    }
+    #header-stats { display: flex; gap: 6px; align-items: center; flex-shrink: 0; flex-wrap: nowrap; }
 
     .stat-pill {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 20px;
-      padding: 4px 12px;
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      white-space: nowrap;
+      background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 20px;
+      padding: 4px 11px; font-size: 0.72rem; color: var(--text-muted);
+      display: flex; align-items: center; gap: 5px; white-space: nowrap;
+      cursor: default; transition: var(--transition);
     }
+    .stat-pill.clickable { cursor: pointer; }
+    .stat-pill.clickable:hover { border-color: var(--border-glow); color: var(--text-primary); background: var(--bg-card-hover); }
+    .stat-pill strong { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .stat-pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent-blue); animation: pulse-dot 2s ease-in-out infinite; }
+    @keyframes pulse-dot { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.5;transform:scale(.7)} }
 
-    .stat-pill strong {
-      color: var(--text-primary);
-      font-weight: 600;
-      font-variant-numeric: tabular-nums;
-    }
+    /* Outbreak badge */
+    #pill-outbreaks { display: none; }
+    #pill-outbreaks.visible { display: flex; }
+    #pill-outbreaks .dot-outbreak { width: 6px; height: 6px; border-radius: 50%; background: var(--ef3); animation: pulse-dot 1.2s ease-in-out infinite; }
 
-    .stat-pill .dot {
-      width: 6px;
-      height: 6px;
-      border-radius: 50%;
-      background: var(--accent-blue);
-      animation: pulse-dot 2s ease-in-out infinite;
+    #btn-refresh {
+      background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 20px;
+      color: var(--text-muted); font-size: 0.9rem; width: 28px; height: 28px;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: var(--transition); flex-shrink: 0;
     }
+    #btn-refresh:hover { border-color: var(--border-glow); color: var(--accent-cyan); transform: rotate(30deg); }
+    #btn-refresh.spinning { animation: spin 0.7s linear infinite; pointer-events: none; color: var(--accent-blue); }
 
-    @keyframes pulse-dot {
-      0%, 100% { opacity: 1; transform: scale(1); }
-      50%       { opacity: 0.5; transform: scale(0.7); }
-    }
-
-    /* ── Main content area ── */
-    #main {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-      position: relative;
-    }
+    /* ── Main ── */
+    #main { display: flex; flex: 1; overflow: hidden; position: relative; }
 
     /* ============================================================
-       SIDEBAR / CONTROL PANEL
+       SIDEBAR
     ============================================================ */
     #sidebar {
-      width: 310px;
-      min-width: 310px;
-      background: rgba(7, 11, 20, 0.96);
-      border-right: 1px solid var(--border-subtle);
-      display: flex;
-      flex-direction: column;
-      overflow-y: auto;
-      z-index: 900;
-      backdrop-filter: blur(16px);
-      flex-shrink: 0;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border-subtle) transparent;
+      width: 310px; min-width: 310px; background: rgba(7, 11, 20, 0.96);
+      border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column;
+      overflow-y: auto; z-index: 900; backdrop-filter: blur(16px); flex-shrink: 0;
+      scrollbar-width: thin; scrollbar-color: var(--border-subtle) transparent;
     }
-
     #sidebar::-webkit-scrollbar { width: 4px; }
-    #sidebar::-webkit-scrollbar-track { background: transparent; }
-    #sidebar::-webkit-scrollbar-thumb {
-      background: var(--border-subtle);
-      border-radius: 4px;
-    }
+    #sidebar::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
 
-    /* ── Mobile: sidebar toggles as a floating panel ── */
     @media (max-width: 800px) {
       #sidebar {
-        position: absolute;
-        top: 0; left: 0;
-        height: 100%;
-        transform: translateX(-100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: 4px 0 40px rgba(0,0,0,0.8);
-        z-index: 1050;
+        position: absolute; top: 0; left: 0; height: 100%;
+        transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+        box-shadow: 4px 0 40px rgba(0,0,0,0.8); z-index: 1050;
       }
       #sidebar.open { transform: translateX(0); }
-
       #map { width: 100%; }
     }
 
-    /* ── Section blocks inside sidebar ── */
-    .sidebar-section {
-      padding: 18px 18px 14px;
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
+    .sidebar-section { padding: 16px 16px 12px; border-bottom: 1px solid var(--border-subtle); }
     .sidebar-section:last-child { border-bottom: none; }
 
     .section-label {
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      margin-bottom: 14px;
-      display: flex;
-      align-items: center;
-      gap: 6px;
+      font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase;
+      color: var(--text-dim); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;
     }
+    .section-label::after { content:''; flex:1; height:1px; background: var(--border-subtle); }
 
-    .section-label::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border-subtle);
-    }
-
-    /* ── Filter controls ── */
-    .filter-group {
-      margin-bottom: 14px;
-    }
-
+    .filter-group { margin-bottom: 12px; }
     .filter-group:last-child { margin-bottom: 0; }
 
-    .filter-label {
-      font-size: 0.75rem;
-      font-weight: 500;
-      color: var(--text-muted);
-      margin-bottom: 6px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .filter-label span.val-badge {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      color: var(--accent-cyan);
-      font-size: 0.68rem;
-      font-weight: 600;
-      padding: 1px 8px;
-      border-radius: 20px;
+    .filter-label { font-size: 0.75rem; font-weight: 500; color: var(--text-muted); margin-bottom: 6px; display: flex; align-items: center; justify-content: space-between; }
+    .filter-label .val-badge {
+      background: var(--bg-card); border: 1px solid var(--border-subtle); color: var(--accent-cyan);
+      font-size: 0.68rem; font-weight: 600; padding: 1px 8px; border-radius: 20px;
       font-family: 'JetBrains Mono', monospace;
     }
 
     /* Custom select */
-    .custom-select {
-      position: relative;
-      width: 100%;
-    }
-
+    .custom-select { position: relative; width: 100%; }
     .custom-select select {
-      width: 100%;
-      appearance: none;
-      -webkit-appearance: none;
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      color: var(--text-primary);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.82rem;
-      padding: 9px 34px 9px 12px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: var(--transition);
-      outline: none;
+      width: 100%; appearance: none; -webkit-appearance: none;
+      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      color: var(--text-primary); font-family: 'Inter', sans-serif; font-size: 0.82rem;
+      padding: 9px 32px 9px 10px; border-radius: var(--radius-sm); cursor: pointer; transition: var(--transition); outline: none;
     }
+    .custom-select select:hover, .custom-select select:focus { border-color: var(--border-glow); background: var(--bg-card-hover); box-shadow: 0 0 0 3px rgba(79,144,255,0.12); }
+    .custom-select select option { background: #0d1526; color: var(--text-primary); }
+    .custom-select::after { content:'\25BE'; position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: var(--text-dim); pointer-events: none; font-size: 0.85rem; }
 
-    .custom-select select:hover,
-    .custom-select select:focus {
-      border-color: var(--border-glow);
-      background: var(--bg-card-hover);
-      box-shadow: 0 0 0 3px rgba(79, 144, 255, 0.12);
-    }
-
-    .custom-select select option {
-      background: #0d1526;
-      color: var(--text-primary);
-    }
-
-    .custom-select::after {
-      content: '\25BE';
-      position: absolute;
-      right: 11px;
-      top: 50%;
-      transform: translateY(-50%);
-      color: var(--text-dim);
-      pointer-events: none;
-      font-size: 0.85rem;
-    }
-
-    /* Range slider */
-    .slider-wrap {
-      position: relative;
-    }
-
+    /* Range sliders */
+    .slider-wrap { position: relative; }
     input[type="range"] {
-      width: 100%;
-      height: 4px;
-      -webkit-appearance: none;
-      appearance: none;
-      background: linear-gradient(90deg, var(--accent-blue) var(--fill, 0%), var(--border-subtle) var(--fill, 0%));
-      border-radius: 4px;
-      outline: none;
-      cursor: pointer;
+      width: 100%; height: 4px; -webkit-appearance: none; appearance: none;
+      background: linear-gradient(90deg, var(--accent-blue) var(--fill,0%), var(--border-subtle) var(--fill,0%));
+      border-radius: 4px; outline: none; cursor: pointer;
     }
-
     input[type="range"]::-webkit-slider-thumb {
-      -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
-      border-radius: 50%;
-      background: var(--accent-blue);
-      box-shadow: 0 0 8px rgba(79,144,255,0.6);
-      border: 2px solid var(--bg-darkest);
-      cursor: grab;
-      transition: var(--transition);
+      -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%;
+      background: var(--accent-blue); box-shadow: 0 0 8px rgba(79,144,255,0.6);
+      border: 2px solid var(--bg-darkest); cursor: grab; transition: var(--transition);
     }
-
     input[type="range"]::-webkit-slider-thumb:active { cursor: grabbing; transform: scale(1.2); }
     input[type="range"]::-moz-range-thumb {
-      width: 16px; height: 16px;
-      border-radius: 50%;
-      background: var(--accent-blue);
-      box-shadow: 0 0 8px rgba(79,144,255,0.6);
-      border: 2px solid var(--bg-darkest);
-      cursor: grab;
+      width: 16px; height: 16px; border-radius: 50%; background: var(--accent-blue);
+      box-shadow: 0 0 8px rgba(79,144,255,0.6); border: 2px solid var(--bg-darkest); cursor: grab;
+    }
+    .slider-ticks { display: flex; justify-content: space-between; margin-top: 5px; }
+    .slider-ticks span { font-size: 0.6rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; }
+
+    /* ── Year dual-range slider ── */
+    .year-range-wrap {
+      position: relative; height: 24px; margin-bottom: 4px;
+    }
+    .year-range-wrap input[type="range"] {
+      position: absolute; width: 100%; height: 4px; top: 10px;
+      pointer-events: none; background: transparent;
+    }
+    .year-range-wrap input[type="range"]::-webkit-slider-thumb { pointer-events: all; }
+    .year-range-wrap input[type="range"]::-moz-range-thumb { pointer-events: all; }
+    #year-range-track {
+      position: absolute; top: 12px; left: 0; right: 0; height: 4px;
+      background: var(--border-subtle); border-radius: 4px;
+    }
+    #year-range-fill {
+      position: absolute; top: 12px; height: 4px;
+      background: var(--accent-blue); border-radius: 4px;
     }
 
-    /* Tick marks below slider */
-    .slider-ticks {
-      display: flex;
-      justify-content: space-between;
-      margin-top: 5px;
-    }
+    /* Buttons */
+    .btn-row { display: flex; gap: 6px; margin-top: 12px; }
 
-    .slider-ticks span {
-      font-size: 0.6rem;
-      color: var(--text-dim);
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    /* Apply button */
     #btn-apply {
-      width: 100%;
-      margin-top: 14px;
-      padding: 10px;
+      flex: 1; padding: 10px;
       background: linear-gradient(135deg, var(--accent-blue), #2563eb);
-      border: none;
-      border-radius: var(--radius-sm);
-      color: #fff;
-      font-family: 'Inter', sans-serif;
-      font-size: 0.82rem;
-      font-weight: 600;
-      letter-spacing: 0.04em;
-      cursor: pointer;
-      transition: var(--transition);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
+      border: none; border-radius: var(--radius-sm); color: #fff;
+      font-family: 'Inter', sans-serif; font-size: 0.82rem; font-weight: 600;
+      cursor: pointer; transition: var(--transition);
+      display: flex; align-items: center; justify-content: center; gap: 5px;
     }
-
-    #btn-apply:hover {
-      transform: translateY(-1px);
-      box-shadow: 0 4px 20px rgba(79, 144, 255, 0.4);
-    }
-
+    #btn-apply:hover { transform: translateY(-1px); box-shadow: 0 4px 20px rgba(79,144,255,0.4); }
     #btn-apply:active { transform: translateY(0); }
 
-    #btn-reset {
-      width: 100%;
-      margin-top: 8px;
-      padding: 8px;
-      background: transparent;
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      color: var(--text-muted);
-      font-family: 'Inter', sans-serif;
-      font-size: 0.78rem;
-      cursor: pointer;
-      transition: var(--transition);
+    #btn-fit {
+      padding: 10px 12px; background: var(--bg-card);
+      border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+      color: var(--text-muted); font-family: 'Inter', sans-serif; font-size: 0.82rem;
+      cursor: pointer; transition: var(--transition); white-space: nowrap;
     }
+    #btn-fit:hover { border-color: var(--border-glow); color: var(--accent-cyan); }
 
-    #btn-reset:hover {
-      border-color: var(--border-glow);
-      color: var(--text-primary);
-      background: var(--bg-card);
+    #btn-reset {
+      width: 100%; margin-top: 6px; padding: 8px; background: transparent;
+      border: 1px solid var(--border-subtle); border-radius: var(--radius-sm);
+      color: var(--text-muted); font-family: 'Inter', sans-serif; font-size: 0.78rem;
+      cursor: pointer; transition: var(--transition);
     }
+    #btn-reset:hover { border-color: var(--border-glow); color: var(--text-primary); background: var(--bg-card); }
 
     /* ── EF Legend ── */
-    .legend-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 7px;
-    }
-
+    .legend-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
     .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 9px;
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: var(--transition);
-      user-select: none;
+      display: flex; align-items: center; gap: 7px; padding: 6px 8px;
+      background: var(--bg-card); border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm); cursor: default; transition: var(--transition); user-select: none;
     }
+    .legend-item:hover { border-color: var(--border-glow); background: var(--bg-card-hover); }
+    .ef-swatch { width: 24px; height: 5px; border-radius: 3px; flex-shrink: 0; }
+    .legend-item .ef-label { font-size: 0.72rem; font-weight: 600; color: var(--text-muted); }
+    .legend-item .ef-desc { font-size: 0.62rem; color: var(--text-dim); line-height: 1.2; }
 
-    .legend-item:hover {
-      border-color: var(--border-glow);
-      background: var(--bg-card-hover);
+    /* ── EF Breakdown Chart ── */
+    .ef-chart-row {
+      display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
     }
-
-    .legend-item.active { border-color: var(--border-glow); }
-
-    .ef-swatch {
-      width: 26px;
-      height: 6px;
-      border-radius: 3px;
-      flex-shrink: 0;
+    .ef-chart-row:last-child { margin-bottom: 0; }
+    .ef-chart-label { font-size: 0.68rem; font-weight: 700; font-family: 'JetBrains Mono', monospace; width: 26px; flex-shrink: 0; }
+    .ef-chart-bar-bg {
+      flex: 1; height: 10px; background: rgba(99,148,255,0.08);
+      border-radius: 5px; overflow: hidden;
     }
-
-    .legend-item .ef-label {
-      font-size: 0.72rem;
-      font-weight: 600;
-      color: var(--text-muted);
+    .ef-chart-bar-fill {
+      height: 100%; border-radius: 5px; width: 0%;
+      transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     }
+    .ef-chart-count { font-size: 0.65rem; color: var(--text-dim); font-family: 'JetBrains Mono', monospace; width: 32px; text-align: right; flex-shrink: 0; }
 
-    .legend-item .ef-desc {
-      font-size: 0.63rem;
-      color: var(--text-dim);
-      line-height: 1.2;
+    /* ── Outbreak glow animation ── */
+    @keyframes outbreak-pulse {
+      0%,100% { filter: drop-shadow(0 0 3px rgba(232,52,28,0.5)); }
+      50%      { filter: drop-shadow(0 0 8px rgba(232,52,28,0.9)); }
     }
+    .outbreak-track path { animation: outbreak-pulse 1.8s ease-in-out infinite; }
 
     /* ── Detail panel ── */
-    #detail-panel {
-      flex: 1;
-      padding: 18px;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      overflow: hidden;
-    }
+    #detail-panel { flex:1; padding:16px; display:flex; flex-direction:column; overflow:hidden; }
+    #detail-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; text-align:center; gap:10px; color:var(--text-dim); }
+    #detail-placeholder .icon { font-size:2.5rem; opacity:0.3; }
+    #detail-placeholder p { font-size:0.78rem; line-height:1.5; max-width:200px; }
+    #detail-card { display:none; flex-direction:column; gap:12px; overflow-y:auto; flex:1; scrollbar-width:thin; scrollbar-color:var(--border-subtle) transparent; }
+    #detail-card::-webkit-scrollbar { width:3px; }
+    #detail-card::-webkit-scrollbar-thumb { background:var(--border-subtle); border-radius:3px; }
 
-    #detail-placeholder {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      flex: 1;
-      text-align: center;
-      gap: 10px;
-      color: var(--text-dim);
-    }
-
-    #detail-placeholder .icon {
-      font-size: 2.5rem;
-      opacity: 0.3;
-    }
-
-    #detail-placeholder p {
-      font-size: 0.78rem;
-      line-height: 1.5;
-      max-width: 200px;
-    }
-
-    #detail-card {
-      display: none;
-      flex-direction: column;
-      gap: 12px;
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border-subtle) transparent;
-      flex: 1;
-    }
-
-    #detail-card::-webkit-scrollbar { width: 3px; }
-    #detail-card::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 3px; }
-
-    .detail-header {
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 10px;
-    }
-
-    .detail-ef-badge {
-      font-size: 0.68rem;
-      font-weight: 700;
-      letter-spacing: 0.08em;
-      padding: 4px 10px;
-      border-radius: 20px;
-      flex-shrink: 0;
-      margin-top: 2px;
-    }
-
-    .detail-title {
-      font-size: 0.95rem;
-      font-weight: 700;
-      line-height: 1.3;
-      color: var(--text-primary);
-    }
-
-    .detail-subtitle {
-      font-size: 0.72rem;
-      color: var(--text-muted);
-      margin-top: 2px;
-    }
-
-    .detail-divider {
-      height: 1px;
-      background: var(--border-subtle);
-    }
-
-    .detail-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-
-    .detail-stat {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-sm);
-      padding: 10px 11px;
-    }
-
-    .detail-stat-label {
-      font-size: 0.62rem;
-      font-weight: 600;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      color: var(--text-dim);
-      margin-bottom: 3px;
-    }
-
-    .detail-stat-value {
-      font-size: 0.9rem;
-      font-weight: 700;
-      color: var(--text-primary);
-      font-variant-numeric: tabular-nums;
-    }
-
-    .detail-stat-value.danger { color: var(--ef3); }
-    .detail-stat-value.warning { color: var(--ef1); }
-
-    .detail-stat-unit {
-      font-size: 0.63rem;
-      color: var(--text-dim);
-      font-weight: 400;
-      margin-left: 2px;
-    }
+    .detail-header { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+    .detail-ef-badge { font-size:0.68rem; font-weight:700; letter-spacing:0.08em; padding:4px 10px; border-radius:20px; flex-shrink:0; margin-top:2px; }
+    .detail-title { font-size:0.95rem; font-weight:700; line-height:1.3; color:var(--text-primary); }
+    .detail-subtitle { font-size:0.72rem; color:var(--text-muted); margin-top:2px; }
+    .detail-divider { height:1px; background:var(--border-subtle); }
+    .detail-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .detail-stat { background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-sm); padding:10px 11px; }
+    .detail-stat-label { font-size:0.62rem; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:var(--text-dim); margin-bottom:3px; }
+    .detail-stat-value { font-size:0.9rem; font-weight:700; color:var(--text-primary); font-variant-numeric:tabular-nums; }
+    .detail-stat-value.danger { color:var(--ef3); }
+    .detail-stat-value.warning { color:var(--ef1); }
+    .detail-stat-unit { font-size:0.63rem; color:var(--text-dim); font-weight:400; margin-left:2px; }
 
     /* ============================================================
        MAP
     ============================================================ */
-    #map {
-      flex: 1;
-      background: var(--bg-darkest);
-      position: relative;
-      z-index: 1;
-    }
+    #map { flex:1; background:var(--bg-darkest); position:relative; z-index:1; }
+    #map::before { content:''; position:absolute; top:0;left:0;right:0; height:60px; background:linear-gradient(to bottom,rgba(7,11,20,0.4),transparent); z-index:10; pointer-events:none; }
 
-    /* Override Leaflet popup */
-    .leaflet-popup-content-wrapper {
-      background: rgba(10, 17, 35, 0.97) !important;
-      border: 1px solid var(--border-glow) !important;
-      border-radius: var(--radius-md) !important;
-      box-shadow: 0 8px 40px rgba(0,0,0,0.8), 0 0 20px rgba(79,144,255,0.15) !important;
-      backdrop-filter: blur(16px) !important;
-      color: var(--text-primary) !important;
-      padding: 0 !important;
-      overflow: hidden;
-    }
+    /* Leaflet popup overrides */
+    .leaflet-popup-content-wrapper { background:rgba(10,17,35,0.97)!important; border:1px solid var(--border-glow)!important; border-radius:var(--radius-md)!important; box-shadow:0 8px 40px rgba(0,0,0,0.8),0 0 20px rgba(79,144,255,0.15)!important; backdrop-filter:blur(16px)!important; color:var(--text-primary)!important; padding:0!important; overflow:hidden; }
+    .leaflet-popup-content { margin:0!important; width:auto!important; }
+    .leaflet-popup-tip { background:rgba(10,17,35,0.97)!important; }
+    .leaflet-popup-close-button { color:var(--text-dim)!important; font-size:18px!important; top:8px!important; right:10px!important; padding:0!important; width:auto!important; height:auto!important; }
+    .leaflet-popup-close-button:hover { color:var(--text-primary)!important; }
+    .leaflet-control-zoom a { background:rgba(10,17,35,0.9)!important; color:var(--text-muted)!important; border-color:var(--border-subtle)!important; transition:var(--transition)!important; }
+    .leaflet-control-zoom a:hover { background:var(--bg-card-hover)!important; color:var(--text-primary)!important; }
+    .leaflet-control-attribution { background:rgba(7,11,20,0.75)!important; color:var(--text-dim)!important; font-size:0.6rem!important; }
+    .leaflet-control-attribution a { color:var(--accent-blue)!important; }
 
-    .leaflet-popup-content {
-      margin: 0 !important;
-      width: auto !important;
-    }
+    /* Popup content */
+    .tornado-popup { width:260px; font-family:'Inter',sans-serif; }
+    .tp-header { padding:14px 16px 12px; border-bottom:1px solid var(--border-subtle); display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+    .tp-ef-pill { font-size:0.65rem; font-weight:700; letter-spacing:0.1em; padding:3px 9px; border-radius:20px; flex-shrink:0; }
+    .tp-title { font-size:0.85rem; font-weight:700; color:var(--text-primary); }
+    .tp-date  { font-size:0.7rem; color:var(--text-muted); margin-top:2px; }
+    .tp-body  { padding:12px 16px 14px; display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .tp-stat { display:flex; flex-direction:column; gap:2px; }
+    .tp-stat-label { font-size:0.58rem; font-weight:600; text-transform:uppercase; letter-spacing:0.08em; color:var(--text-dim); }
+    .tp-stat-value { font-size:0.82rem; font-weight:700; color:var(--text-primary); font-variant-numeric:tabular-nums; }
+    .tp-stat-value.danger  { color:var(--ef3); }
+    .tp-stat-value.warning { color:var(--ef1); }
+    .tp-stat-unit { font-size:0.6rem; color:var(--text-dim); margin-left:2px; }
+    .tp-footer { padding:8px 16px 12px; font-size:0.68rem; color:var(--text-dim); border-top:1px solid var(--border-subtle); }
 
-    .leaflet-popup-tip {
-      background: rgba(10, 17, 35, 0.97) !important;
-    }
-
-    .leaflet-popup-close-button {
-      color: var(--text-dim) !important;
-      font-size: 18px !important;
-      top: 8px !important;
-      right: 10px !important;
-      padding: 0 !important;
-      width: auto !important;
-      height: auto !important;
-    }
-
-    .leaflet-popup-close-button:hover { color: var(--text-primary) !important; }
-
-    /* Custom popup content */
-    .tornado-popup {
-      width: 260px;
-      font-family: 'Inter', sans-serif;
-    }
-
-    .tp-header {
-      padding: 14px 16px 12px;
-      border-bottom: 1px solid var(--border-subtle);
-      display: flex;
-      align-items: flex-start;
-      justify-content: space-between;
-      gap: 8px;
-    }
-
-    .tp-ef-pill {
-      font-size: 0.65rem;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      padding: 3px 9px;
-      border-radius: 20px;
-      flex-shrink: 0;
-    }
-
-    .tp-title { font-size: 0.85rem; font-weight: 700; color: var(--text-primary); }
-    .tp-date  { font-size: 0.7rem;  color: var(--text-muted); margin-top: 2px; }
-
-    .tp-body {
-      padding: 12px 16px 14px;
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-
-    .tp-stat { display: flex; flex-direction: column; gap: 2px; }
-    .tp-stat-label { font-size: 0.58rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); }
-    .tp-stat-value { font-size: 0.82rem; font-weight: 700; color: var(--text-primary); font-variant-numeric: tabular-nums; }
-    .tp-stat-value.danger  { color: var(--ef3); }
-    .tp-stat-value.warning { color: var(--ef1); }
-    .tp-stat-unit { font-size: 0.6rem; color: var(--text-dim); margin-left: 2px; }
-
-    .tp-footer {
-      padding: 8px 16px 12px;
-      font-size: 0.68rem;
-      color: var(--text-dim);
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      border-top: 1px solid var(--border-subtle);
-    }
-
-    /* ── Sidebar toggle button (mobile) ── */
-    #sidebar-toggle {
-      display: none;
-      position: absolute;
-      bottom: 20px;
-      right: 20px;
-      z-index: 1200;
-      width: 48px;
-      height: 48px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent-blue), #2563eb);
-      border: none;
-      box-shadow: 0 4px 20px rgba(79,144,255,0.5);
-      cursor: pointer;
-      align-items: center;
-      justify-content: center;
-      font-size: 20px;
-      color: #fff;
-      transition: var(--transition);
-    }
-
-    #sidebar-toggle:hover { transform: scale(1.1); }
-
-    @media (max-width: 800px) {
-      #sidebar-toggle { display: flex; }
-    }
+    /* ── Mobile toggle ── */
+    #sidebar-toggle { display:none; position:absolute; bottom:20px; right:20px; z-index:1200; width:48px; height:48px; border-radius:50%; background:linear-gradient(135deg,var(--accent-blue),#2563eb); border:none; box-shadow:0 4px 20px rgba(79,144,255,0.5); cursor:pointer; align-items:center; justify-content:center; font-size:20px; color:#fff; transition:var(--transition); }
+    #sidebar-toggle:hover { transform:scale(1.1); }
+    @media (max-width:800px) { #sidebar-toggle { display:flex; } }
 
     /* ── Loading overlay ── */
-    #loading-overlay {
-      position: absolute;
-      inset: 0;
-      background: var(--bg-darkest);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      z-index: 9999;
-      gap: 16px;
-      transition: opacity 0.5s ease;
-    }
+    #loading-overlay { position:absolute; inset:0; background:var(--bg-darkest); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; gap:16px; transition:opacity 0.5s ease; }
+    #loading-overlay.hidden { opacity:0; pointer-events:none; }
+    .spinner { width:44px; height:44px; border:3px solid var(--border-subtle); border-top-color:var(--accent-blue); border-radius:50%; animation:spin 0.8s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .loading-text { font-size:0.82rem; color:var(--text-muted); letter-spacing:0.06em; }
+    .loading-source { font-size:0.68rem; color:var(--text-dim); margin-top:4px; letter-spacing:0.04em; }
 
-    #loading-overlay.hidden { opacity: 0; pointer-events: none; }
-
-    .spinner {
-      width: 44px;
-      height: 44px;
-      border: 3px solid var(--border-subtle);
-      border-top-color: var(--accent-blue);
-      border-radius: 50%;
-      animation: spin 0.8s linear infinite;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    .loading-text {
-      font-size: 0.82rem;
-      color: var(--text-muted);
-      letter-spacing: 0.06em;
-    }
-
-    /* ── No results notice ── */
-    #no-results {
-      display: none;
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: var(--radius-md);
-      padding: 20px 28px;
-      text-align: center;
-      z-index: 800;
-      backdrop-filter: blur(12px);
-    }
-
-    #no-results .nr-icon { font-size: 2rem; margin-bottom: 8px; }
-    #no-results p { font-size: 0.82rem; color: var(--text-muted); }
-    #no-results strong { color: var(--text-primary); }
-
-    /* ── Refresh button ── */
-    #btn-refresh {
-      background: var(--bg-card);
-      border: 1px solid var(--border-subtle);
-      border-radius: 20px;
-      color: var(--text-muted);
-      font-size: 0.9rem;
-      width: 28px;
-      height: 28px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: pointer;
-      transition: var(--transition);
-      flex-shrink: 0;
-    }
-
-    #btn-refresh:hover {
-      border-color: var(--border-glow);
-      color: var(--accent-cyan);
-      transform: rotate(30deg);
-    }
-
-    #btn-refresh.spinning {
-      animation: spin 0.7s linear infinite;
-      pointer-events: none;
-      color: var(--accent-blue);
-    }
-
-    /* ── Data source badge on loading screen ── */
-    .loading-source {
-      font-size: 0.68rem;
-      color: var(--text-dim);
-      margin-top: 4px;
-      letter-spacing: 0.04em;
-    }
-
-    /* ── Subtle map glow overlay ── */
-    #map::before {
-      content: '';
-      position: absolute;
-      top: 0; left: 0; right: 0;
-      height: 60px;
-      background: linear-gradient(to bottom, rgba(7,11,20,0.4), transparent);
-      z-index: 10;
-      pointer-events: none;
-    }
-
-    /* ── Leaflet overrides for dark theme ── */
-    .leaflet-control-zoom a {
-      background: rgba(10,17,35,0.9) !important;
-      color: var(--text-muted) !important;
-      border-color: var(--border-subtle) !important;
-      transition: var(--transition) !important;
-    }
-
-    .leaflet-control-zoom a:hover {
-      background: var(--bg-card-hover) !important;
-      color: var(--text-primary) !important;
-    }
-
-    .leaflet-control-attribution {
-      background: rgba(7,11,20,0.75) !important;
-      color: var(--text-dim) !important;
-      font-size: 0.6rem !important;
-    }
-
-    .leaflet-control-attribution a { color: var(--accent-blue) !important; }
+    /* ── No results ── */
+    #no-results { display:none; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); background:var(--bg-card); border:1px solid var(--border-subtle); border-radius:var(--radius-md); padding:20px 28px; text-align:center; z-index:800; backdrop-filter:blur(12px); }
+    #no-results .nr-icon { font-size:2rem; margin-bottom:8px; }
+    #no-results p { font-size:0.82rem; color:var(--text-muted); }
+    #no-results strong { color:var(--text-primary); }
   </style>
 </head>
 <body>
 
-<!-- Loading overlay -->
 <div id="loading-overlay">
   <div class="spinner"></div>
   <span class="loading-text" id="loading-text">Loading Tornado Data...</span>
   <span class="loading-source" id="loading-source"></span>
 </div>
 
-<!-- Mobile sidebar toggle -->
 <button id="sidebar-toggle" aria-label="Toggle filter panel" title="Filters">&#9776;</button>
 
 <div id="app">
 
-  <!-- ═══════════════════════════════════════════
-       HEADER
-  ═══════════════════════════════════════════ -->
   <header id="header">
     <div id="header-brand">
       <div class="logo-icon">&#127786;</div>
@@ -856,376 +357,383 @@
         <span class="dot"></span>
         <span>Visible: <strong id="stat-visible">0</strong></span>
       </div>
-      <div class="stat-pill">
+      <div class="stat-pill clickable" id="pill-total" title="Click to fit map to all visible tracks">
         <span>Total: <strong id="stat-total">0</strong></span>
       </div>
-      <div class="stat-pill">
-        <span>Fatalities: <strong id="stat-fatalities">0</strong></span>
+      <div class="stat-pill clickable" id="pill-fatal" title="Click to jump to deadliest visible tornado">
+        <span>&#128420; <strong id="stat-fatalities">0</strong> fatal</span>
       </div>
-      <div class="stat-pill" id="pill-updated" title="Data is cached locally and refreshed automatically">
+      <div class="stat-pill clickable" id="pill-outbreaks" title="Click to fit outbreak day tracks">
+        <span class="dot-outbreak"></span>
+        <span>Outbreaks: <strong id="stat-outbreaks">0</strong></span>
+      </div>
+      <div class="stat-pill" id="pill-updated" title="Data auto-refreshes every Monday via GitHub Actions">
         <span>Updated: <strong id="stat-updated">--</strong></span>
       </div>
       <button id="btn-refresh" title="Force refresh data from server" aria-label="Refresh tornado data">&#8635;</button>
     </div>
   </header>
 
-  <!-- ═══════════════════════════════════════════
-       MAIN
-  ═══════════════════════════════════════════ -->
   <div id="main">
 
-    <!-- ── SIDEBAR ── -->
     <aside id="sidebar" role="complementary" aria-label="Tornado filter controls">
 
-      <!-- Filters section -->
+      <!-- ── FILTERS ── -->
       <div class="sidebar-section">
         <p class="section-label">&#128269; Filters</p>
 
-        <!-- Month filter -->
+        <!-- Year range -->
+        <div class="filter-group">
+          <div class="filter-label">
+            Year Range
+            <span class="val-badge" id="year-badge">----</span>
+          </div>
+          <div class="year-range-wrap">
+            <div id="year-range-track"></div>
+            <div id="year-range-fill"></div>
+            <input type="range" id="filter-year-min" min="2000" max="2024" value="2000" step="1" aria-label="Minimum year" />
+            <input type="range" id="filter-year-max" min="2000" max="2024" value="2024" step="1" aria-label="Maximum year" />
+          </div>
+          <div class="slider-ticks" id="year-ticks">
+            <span id="year-tick-min">2000</span>
+            <span id="year-tick-max">2024</span>
+          </div>
+        </div>
+
+        <!-- Month -->
         <div class="filter-group">
           <div class="filter-label">Month</div>
           <div class="custom-select">
             <select id="filter-month" aria-label="Filter by month">
               <option value="all">All Months</option>
-              <option value="1">January</option>
-              <option value="2">February</option>
-              <option value="3">March</option>
-              <option value="4">April</option>
-              <option value="5">May</option>
-              <option value="6">June</option>
-              <option value="7">July</option>
-              <option value="8">August</option>
-              <option value="9">September</option>
-              <option value="10">October</option>
-              <option value="11">November</option>
-              <option value="12">December</option>
+              <option value="1">January</option><option value="2">February</option>
+              <option value="3">March</option><option value="4">April</option>
+              <option value="5">May</option><option value="6">June</option>
+              <option value="7">July</option><option value="8">August</option>
+              <option value="9">September</option><option value="10">October</option>
+              <option value="11">November</option><option value="12">December</option>
             </select>
           </div>
         </div>
 
-        <!-- Day of month slider -->
+        <!-- Day -->
         <div class="filter-group">
           <div class="filter-label">
             Day of Month
             <span class="val-badge" id="day-badge">All</span>
           </div>
           <div class="slider-wrap">
-            <input
-              type="range"
-              id="filter-day"
-              min="0"
-              max="31"
-              value="0"
-              step="1"
-              aria-label="Filter by day of month (0 = all days)"
-            />
+            <input type="range" id="filter-day" min="0" max="31" value="0" step="1" aria-label="Filter by day of month" />
           </div>
           <div class="slider-ticks">
-            <span>Any</span>
-            <span>8</span>
-            <span>15</span>
-            <span>23</span>
-            <span>31</span>
+            <span>Any</span><span>8</span><span>15</span><span>23</span><span>31</span>
           </div>
         </div>
 
-        <!-- EF scale filter -->
+        <!-- State -->
+        <div class="filter-group">
+          <div class="filter-label">State</div>
+          <div class="custom-select">
+            <select id="filter-state" aria-label="Filter by state">
+              <option value="all">All States</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- EF scale -->
         <div class="filter-group">
           <div class="filter-label">Minimum EF Rating</div>
           <div class="custom-select">
             <select id="filter-ef" aria-label="Filter by minimum EF rating">
               <option value="-1">All Ratings</option>
-              <option value="0">EF0+</option>
-              <option value="1">EF1+</option>
-              <option value="2">EF2+</option>
-              <option value="3">EF3+</option>
-              <option value="4">EF4+</option>
-              <option value="5">EF5 Only</option>
+              <option value="0">EF0+</option><option value="1">EF1+</option>
+              <option value="2">EF2+</option><option value="3">EF3+</option>
+              <option value="4">EF4+</option><option value="5">EF5 Only</option>
             </select>
           </div>
         </div>
 
-        <button id="btn-apply">&#9889; Apply Filters</button>
-        <button id="btn-reset">&#8634; Reset All</button>
+        <!-- Casualty threshold -->
+        <div class="filter-group">
+          <div class="filter-label">
+            Min. Casualties (fat + inj)
+            <span class="val-badge" id="casualty-badge">Any</span>
+          </div>
+          <div class="slider-wrap">
+            <input type="range" id="filter-casualty" min="0" max="50" value="0" step="1" aria-label="Minimum casualty count" />
+          </div>
+          <div class="slider-ticks">
+            <span>0</span><span>12</span><span>25</span><span>37</span><span>50+</span>
+          </div>
+        </div>
+
+        <div class="btn-row">
+          <button id="btn-apply">&#9889; Apply</button>
+          <button id="btn-fit" title="Zoom map to filtered tracks">&#128205; Fit</button>
+        </div>
+        <button id="btn-reset">&#8634; Reset All Filters</button>
       </div>
 
-      <!-- EF Legend section -->
+      <!-- ── EF LEGEND ── -->
       <div class="sidebar-section">
         <p class="section-label">&#127912; EF Scale</p>
-        <div class="legend-grid" id="ef-legend">
-          <!-- Populated by JS -->
-        </div>
+        <div class="legend-grid" id="ef-legend"></div>
+        <p style="font-size:0.62rem;color:var(--text-dim);margin-top:8px;line-height:1.4;">Track width scales with actual tornado path width (yards).</p>
       </div>
 
-      <!-- Detail panel section -->
-      <div class="sidebar-section" id="detail-panel" style="flex:1; overflow:hidden; display:flex; flex-direction:column;">
-        <p class="section-label">&#128203; Track Detail</p>
+      <!-- ── EF BREAKDOWN CHART ── -->
+      <div class="sidebar-section">
+        <p class="section-label">&#128202; EF Breakdown</p>
+        <div id="ef-chart"></div>
+      </div>
 
+      <!-- ── TRACK DETAIL ── -->
+      <div class="sidebar-section" id="detail-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+        <p class="section-label">&#128203; Track Detail</p>
         <div id="detail-placeholder">
           <div class="icon">&#127786;</div>
           <p>Click any tornado track on the map to see detailed information here.</p>
         </div>
-
         <div id="detail-card"></div>
       </div>
 
     </aside>
 
-    <!-- ── MAP ── -->
     <div id="map" role="main" aria-label="Tornado track map"></div>
 
-    <!-- No results notice -->
     <div id="no-results">
       <div class="nr-icon">&#128269;</div>
-      <p><strong>No tornado tracks</strong> match the current filters.<br/>Try expanding your date range.</p>
+      <p><strong>No tornado tracks</strong> match the current filters.<br/>Try expanding your filters.</p>
     </div>
 
-  </div><!-- /#main -->
-</div><!-- /#app -->
+  </div>
+</div>
 
-<!-- Leaflet JS -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
 <script>
 /* ================================================================
-   TORNADOTRACKER - Main Application Script
+   TORNADOTRACKER — Main Application Script
    yorkdevelops.com
    ================================================================ */
-
 'use strict';
 
 // ---------------------------------------------------------------
-//  CONFIGURATION
+//  CONFIG
 // ---------------------------------------------------------------
 var CONFIG = {
-  mapCenter:  [38.5, -96.5],    // Center of the continental US
-  mapZoom:    5,
-  minZoom:    3,
-  maxZoom:    15,
-  trackWeight:        3,
-  trackOpacity:       0.85,
-  trackWeightHover:   6,
-  trackOpacityHover:  1.0
+  mapCenter:  [38.5, -96.5],
+  mapZoom:    5, minZoom: 3, maxZoom: 15,
+  trackOpacity:      0.82,
+  trackWeightBase:   2,    // minimum line weight
+  trackWeightScale:  10,   // max additional weight from width_yd
+  trackWeightHover:  7,
+  trackOpacityHover: 1.0,
+  outbreakThreshold: 5     // tornadoes/day to flag as outbreak
 };
 
-// EF Scale colour palette and metadata
 var EF_SCALE = [
-  { id: 0, color: '#f5e642', label: 'EF0', desc: '65-85 mph',   glow: 'rgba(245,230,66,0.5)'  },
-  { id: 1, color: '#f5a623', label: 'EF1', desc: '86-110 mph',  glow: 'rgba(245,166,35,0.5)'  },
-  { id: 2, color: '#f56e20', label: 'EF2', desc: '111-135 mph', glow: 'rgba(245,110,32,0.5)'  },
-  { id: 3, color: '#e8341c', label: 'EF3', desc: '136-165 mph', glow: 'rgba(232,52,28,0.5)'   },
-  { id: 4, color: '#a81dd8', label: 'EF4', desc: '166-200 mph', glow: 'rgba(168,29,216,0.5)'  },
-  { id: 5, color: '#5c0ab0', label: 'EF5', desc: '200+ mph',    glow: 'rgba(92,10,176,0.5)'   }
+  { id:0, color:'#f5e642', label:'EF0', desc:'65-85 mph',   glow:'rgba(245,230,66,0.5)'  },
+  { id:1, color:'#f5a623', label:'EF1', desc:'86-110 mph',  glow:'rgba(245,166,35,0.5)'  },
+  { id:2, color:'#f56e20', label:'EF2', desc:'111-135 mph', glow:'rgba(245,110,32,0.5)'  },
+  { id:3, color:'#e8341c', label:'EF3', desc:'136-165 mph', glow:'rgba(232,52,28,0.5)'   },
+  { id:4, color:'#a81dd8', label:'EF4', desc:'166-200 mph', glow:'rgba(168,29,216,0.5)'  },
+  { id:5, color:'#5c0ab0', label:'EF5', desc:'200+ mph',    glow:'rgba(92,10,176,0.5)'   }
 ];
 
-function efColor(rating) {
-  var scale = EF_SCALE[Math.min(Math.max(rating, 0), 5)];
-  return scale ? scale.color : '#ccc';
-}
-
-function efInfo(rating) {
-  return EF_SCALE[Math.min(Math.max(rating, 0), 5)] || EF_SCALE[0];
-}
+function efColor(r) { return (EF_SCALE[Math.min(Math.max(r,0),5)] || EF_SCALE[0]).color; }
+function efInfo(r)  { return  EF_SCALE[Math.min(Math.max(r,0),5)] || EF_SCALE[0]; }
 
 // ---------------------------------------------------------------
-//  SAMPLE DATA (GeoJSON FeatureCollection)
+//  BUILT-IN SAMPLE DATA (fallback when tornadoes.geojson not found)
 //
 //  +===========================================================+
-//  |  HOW TO LOAD REAL DATA                                    |
-//  |                                                           |
-//  |  Replace the TORNADO_GEOJSON object below with a          |
-//  |  fetch() call. Inside the DOMContentLoaded callback,      |
-//  |  swap the mock-data block with:                           |
-//  |                                                           |
-//  |    fetch('tornadoes.geojson')                             |
-//  |      .then(function(r) { return r.json(); })              |
-//  |      .then(function(data) {                               |
-//  |        initTornadoLayer(data);                            |
-//  |        hideLoader();                                       |
-//  |      })                                                    |
-//  |      .catch(function(err) {                               |
-//  |        console.error('Failed to load GeoJSON:', err);     |
-//  |      });                                                   |
-//  |                                                           |
-//  |  Expected GeoJSON structure per feature:                  |
-//  |    geometry.type:       "LineString"                      |
-//  |    properties.ef:       number  (0-5)                     |
-//  |    properties.date:     string  "YYYY-MM-DD"              |
-//  |    properties.time:     string  "HH:MM"                   |
-//  |    properties.state:    string                            |
-//  |    properties.width_yd: number  (path width, yards)       |
-//  |    properties.len_mi:   number  (path length, miles)      |
-//  |    properties.injuries: number                            |
-//  |    properties.fat:      number  (fatalities)              |
-//  |    properties.location: string  (community name)          |
+//  |  REAL DATA is loaded automatically from tornadoes.geojson  |
+//  |  generated by GitHub Actions (scripts/fetch_tornadoes.py) |
+//  |  URL: ./tornadoes.geojson                                 |
+//  |  Cache: localStorage, 6-hour TTL                          |
 //  +===========================================================+
 // ---------------------------------------------------------------
-
 var TORNADO_GEOJSON = {
   type: "FeatureCollection",
   features: [
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-96.54, 41.32], [-96.18, 41.45], [-95.87, 41.53]] },
-      properties: { ef: 0, date: "2023-05-03", time: "14:22", state: "NE", location: "Omaha Metro", width_yd: 25, len_mi: 3.2, injuries: 0, fat: 0 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-97.14, 35.42], [-96.91, 35.61], [-96.65, 35.72], [-96.30, 35.80]] },
-      properties: { ef: 1, date: "2023-05-03", time: "18:47", state: "OK", location: "Oklahoma City NW", width_yd: 75, len_mi: 8.7, injuries: 3, fat: 0 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-94.60, 37.02], [-94.28, 37.19], [-93.95, 37.30], [-93.72, 37.38]] },
-      properties: { ef: 2, date: "2023-04-19", time: "20:05", state: "MO", location: "Joplin Corridor", width_yd: 300, len_mi: 14.5, injuries: 18, fat: 1 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-88.22, 34.88], [-87.85, 34.97], [-87.52, 35.07], [-87.20, 35.14], [-86.90, 35.22]] },
-      properties: { ef: 3, date: "2023-03-25", time: "21:33", state: "TN", location: "Clarksville", width_yd: 880, len_mi: 27.3, injuries: 56, fat: 4 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-90.31, 33.01], [-89.80, 33.18], [-89.35, 33.29], [-88.95, 33.38], [-88.52, 33.44]] },
-      properties: { ef: 4, date: "2023-02-12", time: "22:18", state: "MS", location: "Yazoo County", width_yd: 1760, len_mi: 45.8, injuries: 147, fat: 10 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-95.71, 36.84], [-95.22, 36.98], [-94.78, 37.10], [-94.30, 37.20], [-93.80, 37.28]] },
-      properties: { ef: 5, date: "2023-05-20", time: "17:56", state: "KS", location: "Greensburg Area", width_yd: 2640, len_mi: 61.2, injuries: 384, fat: 24 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-102.10, 33.55], [-101.75, 33.62], [-101.40, 33.72]] },
-      properties: { ef: 0, date: "2023-06-08", time: "15:10", state: "TX", location: "Lubbock NE", width_yd: 15, len_mi: 2.1, injuries: 0, fat: 0 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-98.52, 29.40], [-98.20, 29.50], [-97.95, 29.62]] },
-      properties: { ef: 1, date: "2023-04-19", time: "09:45", state: "TX", location: "San Antonio N", width_yd: 100, len_mi: 6.3, injuries: 7, fat: 0 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-86.70, 36.02], [-86.35, 36.14], [-86.00, 36.22], [-85.72, 36.30]] },
-      properties: { ef: 2, date: "2023-12-09", time: "23:55", state: "TN", location: "Nashville East", width_yd: 440, len_mi: 17.9, injuries: 31, fat: 2 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-81.55, 28.65], [-81.28, 28.75], [-81.10, 28.88]] },
-      properties: { ef: 0, date: "2023-01-12", time: "11:30", state: "FL", location: "Orlando Metro", width_yd: 20, len_mi: 2.8, injuries: 0, fat: 0 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-104.80, 38.80], [-104.45, 38.92], [-104.10, 39.02]] },
-      properties: { ef: 1, date: "2023-07-15", time: "16:25", state: "CO", location: "Colorado Springs E", width_yd: 80, len_mi: 5.0, injuries: 2, fat: 0 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-93.30, 44.80], [-92.90, 44.88], [-92.55, 44.95], [-92.20, 45.00]] },
-      properties: { ef: 2, date: "2023-08-21", time: "19:40", state: "MN", location: "Twin Cities SE", width_yd: 500, len_mi: 20.5, injuries: 25, fat: 0 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-87.05, 41.60], [-86.75, 41.69], [-86.50, 41.76]] },
-      properties: { ef: 0, date: "2023-05-03", time: "22:15", state: "IN", location: "South Bend S", width_yd: 10, len_mi: 1.4, injuries: 0, fat: 0 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-84.50, 33.70], [-84.18, 33.80], [-83.85, 33.88], [-83.50, 33.95]] },
-      properties: { ef: 3, date: "2023-03-25", time: "03:12", state: "GA", location: "Atlanta NE", width_yd: 1200, len_mi: 35.1, injuries: 88, fat: 6 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-97.55, 37.68], [-97.25, 37.80], [-96.95, 37.88], [-96.62, 37.95]] },
-      properties: { ef: 4, date: "2023-05-03", time: "20:04", state: "KS", location: "Wichita NE", width_yd: 2000, len_mi: 52.3, injuries: 210, fat: 14 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-100.18, 36.08], [-99.85, 36.20], [-99.50, 36.28], [-99.15, 36.35]] },
-      properties: { ef: 1, date: "2023-06-08", time: "19:22", state: "OK", location: "Woodward County", width_yd: 150, len_mi: 9.8, injuries: 4, fat: 0 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-91.20, 30.22], [-90.85, 30.34], [-90.50, 30.42]] },
-      properties: { ef: 2, date: "2023-04-19", time: "14:08", state: "LA", location: "Baton Rouge N", width_yd: 600, len_mi: 11.2, injuries: 19, fat: 1 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-78.80, 35.58], [-78.52, 35.70], [-78.22, 35.80], [-77.95, 35.88]] },
-      properties: { ef: 0, date: "2023-11-05", time: "08:45", state: "NC", location: "Raleigh W", width_yd: 30, len_mi: 4.6, injuries: 1, fat: 0 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-96.00, 40.25], [-95.72, 40.38], [-95.42, 40.48], [-95.10, 40.55]] },
-      properties: { ef: 5, date: "2023-05-20", time: "16:35", state: "NE", location: "Lincoln SW", width_yd: 3000, len_mi: 75.0, injuries: 450, fat: 32 }
-    },
-    {
-      type: "Feature",
-      geometry: { type: "LineString", coordinates: [[-89.95, 35.10], [-89.68, 35.24], [-89.40, 35.34], [-89.12, 35.44]] },
-      properties: { ef: 3, date: "2023-12-09", time: "21:50", state: "TN", location: "Memphis E", width_yd: 990, len_mi: 29.6, injuries: 72, fat: 5 }
-    }
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-96.54,41.32],[-96.18,41.45],[-95.87,41.53]]}, properties:{ef:0,date:"2023-05-03",time:"14:22",state:"NE",location:"Omaha Metro",width_yd:25,len_mi:3.2,injuries:0,fat:0} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-97.14,35.42],[-96.91,35.61],[-96.65,35.72],[-96.30,35.80]]}, properties:{ef:1,date:"2023-05-03",time:"18:47",state:"OK",location:"Oklahoma City NW",width_yd:75,len_mi:8.7,injuries:3,fat:0} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-94.60,37.02],[-94.28,37.19],[-93.95,37.30],[-93.72,37.38]]}, properties:{ef:2,date:"2023-04-19",time:"20:05",state:"MO",location:"Joplin Corridor",width_yd:300,len_mi:14.5,injuries:18,fat:1} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-88.22,34.88],[-87.85,34.97],[-87.52,35.07],[-87.20,35.14],[-86.90,35.22]]}, properties:{ef:3,date:"2023-03-25",time:"21:33",state:"TN",location:"Clarksville",width_yd:880,len_mi:27.3,injuries:56,fat:4} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-90.31,33.01],[-89.80,33.18],[-89.35,33.29],[-88.95,33.38],[-88.52,33.44]]}, properties:{ef:4,date:"2023-02-12",time:"22:18",state:"MS",location:"Yazoo County",width_yd:1760,len_mi:45.8,injuries:147,fat:10} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-95.71,36.84],[-95.22,36.98],[-94.78,37.10],[-94.30,37.20],[-93.80,37.28]]}, properties:{ef:5,date:"2023-05-20",time:"17:56",state:"KS",location:"Greensburg Area",width_yd:2640,len_mi:61.2,injuries:384,fat:24} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-102.10,33.55],[-101.75,33.62],[-101.40,33.72]]}, properties:{ef:0,date:"2023-06-08",time:"15:10",state:"TX",location:"Lubbock NE",width_yd:15,len_mi:2.1,injuries:0,fat:0} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-98.52,29.40],[-98.20,29.50],[-97.95,29.62]]}, properties:{ef:1,date:"2023-04-19",time:"09:45",state:"TX",location:"San Antonio N",width_yd:100,len_mi:6.3,injuries:7,fat:0} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-86.70,36.02],[-86.35,36.14],[-86.00,36.22],[-85.72,36.30]]}, properties:{ef:2,date:"2023-12-09",time:"23:55",state:"TN",location:"Nashville East",width_yd:440,len_mi:17.9,injuries:31,fat:2} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-81.55,28.65],[-81.28,28.75],[-81.10,28.88]]}, properties:{ef:0,date:"2023-01-12",time:"11:30",state:"FL",location:"Orlando Metro",width_yd:20,len_mi:2.8,injuries:0,fat:0} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-104.80,38.80],[-104.45,38.92],[-104.10,39.02]]}, properties:{ef:1,date:"2023-07-15",time:"16:25",state:"CO",location:"Colorado Springs E",width_yd:80,len_mi:5.0,injuries:2,fat:0} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-93.30,44.80],[-92.90,44.88],[-92.55,44.95],[-92.20,45.00]]}, properties:{ef:2,date:"2023-08-21",time:"19:40",state:"MN",location:"Twin Cities SE",width_yd:500,len_mi:20.5,injuries:25,fat:0} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-87.05,41.60],[-86.75,41.69],[-86.50,41.76]]}, properties:{ef:0,date:"2023-05-03",time:"22:15",state:"IN",location:"South Bend S",width_yd:10,len_mi:1.4,injuries:0,fat:0} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-84.50,33.70],[-84.18,33.80],[-83.85,33.88],[-83.50,33.95]]}, properties:{ef:3,date:"2023-03-25",time:"03:12",state:"GA",location:"Atlanta NE",width_yd:1200,len_mi:35.1,injuries:88,fat:6} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-97.55,37.68],[-97.25,37.80],[-96.95,37.88],[-96.62,37.95]]}, properties:{ef:4,date:"2023-05-03",time:"20:04",state:"KS",location:"Wichita NE",width_yd:2000,len_mi:52.3,injuries:210,fat:14} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-100.18,36.08],[-99.85,36.20],[-99.50,36.28],[-99.15,36.35]]}, properties:{ef:1,date:"2023-06-08",time:"19:22",state:"OK",location:"Woodward County",width_yd:150,len_mi:9.8,injuries:4,fat:0} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-91.20,30.22],[-90.85,30.34],[-90.50,30.42]]}, properties:{ef:2,date:"2023-04-19",time:"14:08",state:"LA",location:"Baton Rouge N",width_yd:600,len_mi:11.2,injuries:19,fat:1} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-78.80,35.58],[-78.52,35.70],[-78.22,35.80],[-77.95,35.88]]}, properties:{ef:0,date:"2023-11-05",time:"08:45",state:"NC",location:"Raleigh W",width_yd:30,len_mi:4.6,injuries:1,fat:0} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-96.00,40.25],[-95.72,40.38],[-95.42,40.48],[-95.10,40.55]]}, properties:{ef:5,date:"2023-05-20",time:"16:35",state:"NE",location:"Lincoln SW",width_yd:3000,len_mi:75.0,injuries:450,fat:32} },
+    { type:"Feature", geometry:{type:"LineString",coordinates:[[-89.95,35.10],[-89.68,35.24],[-89.40,35.34],[-89.12,35.44]]}, properties:{ef:3,date:"2023-12-09",time:"21:50",state:"TN",location:"Memphis E",width_yd:990,len_mi:29.6,injuries:72,fat:5} }
   ]
 };
 
 // ---------------------------------------------------------------
-//  APPLICATION STATE
+//  STATE
 // ---------------------------------------------------------------
-var tornadoLayer  = null;
-var allFeatures   = [];
-var activeFeature = null;
+var tornadoLayer   = null;
+var allFeatures    = [];
+var activeFeature  = null;
+var outbreakDates  = {};   // date string → true (set of outbreak days)
+var dataYearMin    = 2000;
+var dataYearMax    = 2024;
 
-var filterMonth = 'all';
-var filterDay   = 0;
-var filterEF    = -1;
+var filterMonth    = 'all';
+var filterDay      = 0;
+var filterEF       = -1;
+var filterYearMin  = 2000;
+var filterYearMax  = 2024;
+var filterState    = 'all';
+var filterCasualty = 0;
 
 // ---------------------------------------------------------------
-//  MAP INITIALISATION
+//  MAP
 // ---------------------------------------------------------------
 var map = L.map('map', {
-  center:  CONFIG.mapCenter,
-  zoom:    CONFIG.mapZoom,
-  minZoom: CONFIG.minZoom,
-  maxZoom: CONFIG.maxZoom,
-  zoomControl: true,
-  attributionControl: true
+  center: CONFIG.mapCenter, zoom: CONFIG.mapZoom,
+  minZoom: CONFIG.minZoom, maxZoom: CONFIG.maxZoom
 });
 
-// CartoDB Dark Matter tiles — free, no API key required, dark-themed
-L.tileLayer(
-  'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  {
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains: 'abcd',
-    maxZoom: 19
-  }
-).addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  subdomains: 'abcd', maxZoom: 19
+}).addTo(map);
 
 // ---------------------------------------------------------------
-//  LEGEND BUILDER
+//  TRACK WEIGHT — proportional to actual tornado width
+// ---------------------------------------------------------------
+function trackWeight(width_yd) {
+  // Maps 0–3000 yd → CONFIG.trackWeightBase … +CONFIG.trackWeightScale
+  var w = Math.max(0, Math.min(width_yd || 0, 3000));
+  return CONFIG.trackWeightBase + (w / 3000) * CONFIG.trackWeightScale;
+}
+
+// ---------------------------------------------------------------
+//  LEGEND
 // ---------------------------------------------------------------
 function buildLegend() {
   var container = document.getElementById('ef-legend');
   container.innerHTML = '';
-
   EF_SCALE.forEach(function(ef) {
     var item = document.createElement('div');
     item.className = 'legend-item';
-    item.dataset.ef = ef.id;
     item.innerHTML =
-      '<div class="ef-swatch" style="background:' + ef.color + ';box-shadow:0 0 6px ' + ef.glow + '"></div>' +
-      '<div>' +
-        '<div class="ef-label">' + ef.label + '</div>' +
-        '<div class="ef-desc">' + ef.desc + '</div>' +
-      '</div>';
+      '<div class="ef-swatch" style="background:' + ef.color + ';box-shadow:0 0 5px ' + ef.glow + '"></div>' +
+      '<div><div class="ef-label">' + ef.label + '</div><div class="ef-desc">' + ef.desc + '</div></div>';
     container.appendChild(item);
   });
 }
 
 // ---------------------------------------------------------------
-//  DATA LAYER INITIALISATION
+//  EF BREAKDOWN CHART
+// ---------------------------------------------------------------
+function buildEFChart() {
+  var container = document.getElementById('ef-chart');
+  container.innerHTML = '';
+  EF_SCALE.forEach(function(ef) {
+    var row = document.createElement('div');
+    row.className = 'ef-chart-row';
+    row.innerHTML =
+      '<span class="ef-chart-label" style="color:' + ef.color + '">' + ef.label + '</span>' +
+      '<div class="ef-chart-bar-bg"><div class="ef-chart-bar-fill" id="ef-bar-' + ef.id + '" style="background:' + ef.color + '"></div></div>' +
+      '<span class="ef-chart-count" id="ef-count-' + ef.id + '">0</span>';
+    container.appendChild(row);
+  });
+}
+
+function updateEFChart(counts, total) {
+  EF_SCALE.forEach(function(ef) {
+    var c = counts[ef.id] || 0;
+    var pct = total > 0 ? (c / total * 100) : 0;
+    var bar = document.getElementById('ef-bar-' + ef.id);
+    var cnt = document.getElementById('ef-count-' + ef.id);
+    if (bar) bar.style.width = pct + '%';
+    if (cnt) cnt.textContent = c;
+  });
+}
+
+// ---------------------------------------------------------------
+//  STATE DROPDOWN — built from data
+// ---------------------------------------------------------------
+function buildStateDropdown(features) {
+  var sel = document.getElementById('filter-state');
+  var states = {};
+  features.forEach(function(f) { if (f.properties.state) states[f.properties.state] = true; });
+  var sorted = Object.keys(states).sort();
+  sel.innerHTML = '<option value="all">All States</option>';
+  sorted.forEach(function(st) {
+    var opt = document.createElement('option');
+    opt.value = st;
+    opt.textContent = st;
+    sel.appendChild(opt);
+  });
+}
+
+// ---------------------------------------------------------------
+//  YEAR SLIDER — built from data
+// ---------------------------------------------------------------
+function buildYearSlider(minY, maxY) {
+  dataYearMin   = minY;
+  dataYearMax   = maxY;
+  filterYearMin = minY;
+  filterYearMax = maxY;
+
+  var slMin = document.getElementById('filter-year-min');
+  var slMax = document.getElementById('filter-year-max');
+  slMin.min = minY; slMin.max = maxY; slMin.value = minY;
+  slMax.min = minY; slMax.max = maxY; slMax.value = maxY;
+
+  document.getElementById('year-tick-min').textContent = minY;
+  document.getElementById('year-tick-max').textContent = maxY;
+  document.getElementById('year-badge').textContent = minY + ' \u2013 ' + maxY;
+  updateYearFill();
+}
+
+function updateYearFill() {
+  var slMin = document.getElementById('filter-year-min');
+  var slMax = document.getElementById('filter-year-max');
+  var minY = parseInt(slMin.min, 10);
+  var maxY = parseInt(slMax.max, 10);
+  var span = maxY - minY || 1;
+  var leftPct  = ((filterYearMin - minY) / span) * 100;
+  var rightPct = ((filterYearMax - minY) / span) * 100;
+  var fill = document.getElementById('year-range-fill');
+  if (fill) {
+    fill.style.left  = leftPct + '%';
+    fill.style.width = (rightPct - leftPct) + '%';
+  }
+  document.getElementById('year-badge').textContent = filterYearMin + ' \u2013 ' + filterYearMax;
+}
+
+// ---------------------------------------------------------------
+//  DATA LAYER
 // ---------------------------------------------------------------
 function initTornadoLayer(geojsonData) {
   allFeatures = geojsonData.features;
+
+  // Compute year range from actual data
+  var minY = 9999, maxY = 0;
+  allFeatures.forEach(function(f) {
+    var y = parseInt((f.properties.date || '0').substr(0, 4), 10);
+    if (y > 0) { if (y < minY) minY = y; if (y > maxY) maxY = y; }
+  });
+  if (minY === 9999) { minY = 2000; maxY = 2024; }
+
+  buildYearSlider(minY, maxY);
+  buildStateDropdown(allFeatures);
+  buildEFChart();
+
   document.getElementById('stat-total').textContent = allFeatures.length;
 
   tornadoLayer = L.geoJSON(geojsonData, {
@@ -1233,32 +741,29 @@ function initTornadoLayer(geojsonData) {
     onEachFeature: bindFeatureEvents
   }).addTo(map);
 
-  updateStats();
-  map.fitBounds(tornadoLayer.getBounds().pad(0.08));
+  applyFilters();
+  setTimeout(function() {
+    if (tornadoLayer) map.fitBounds(tornadoLayer.getBounds().pad(0.08));
+  }, 100);
 }
 
 // ---------------------------------------------------------------
-//  STYLE FUNCTION
+//  STYLE — proportional weight
 // ---------------------------------------------------------------
 function featureStyle(feature) {
   return {
-    color:    efColor(feature.properties.ef),
-    weight:   CONFIG.trackWeight,
-    opacity:  CONFIG.trackOpacity,
-    lineCap:  'round',
-    lineJoin: 'round'
+    color:   efColor(feature.properties.ef),
+    weight:  trackWeight(feature.properties.width_yd),
+    opacity: CONFIG.trackOpacity,
+    lineCap: 'round', lineJoin: 'round'
   };
 }
 
 // ---------------------------------------------------------------
-//  FEATURE EVENTS
+//  EVENTS
 // ---------------------------------------------------------------
 function bindFeatureEvents(feature, layer) {
-  layer.on({
-    mouseover: onTrackHover,
-    mouseout:  onTrackOut,
-    click:     onTrackClick
-  });
+  layer.on({ mouseover: onTrackHover, mouseout: onTrackOut, click: onTrackClick });
 }
 
 function onTrackHover(e) {
@@ -1276,6 +781,7 @@ function onTrackOut(e) {
   var layer = e.target;
   if (activeFeature && activeFeature === layer) return;
   tornadoLayer.resetStyle(layer);
+  // Restore proportional weight (resetStyle reverts to featureStyle)
   map.getContainer().style.cursor = '';
 }
 
@@ -1283,39 +789,32 @@ function onTrackClick(e) {
   var layer = e.target;
   var props = layer.feature.properties;
 
-  if (activeFeature && activeFeature !== layer) {
-    tornadoLayer.resetStyle(activeFeature);
-  }
+  if (activeFeature && activeFeature !== layer) tornadoLayer.resetStyle(activeFeature);
 
-  layer.setStyle({
-    weight:  CONFIG.trackWeightHover + 2,
-    opacity: 1,
-    color:   efColor(props.ef)
-  });
+  layer.setStyle({ weight: CONFIG.trackWeightHover + 2, opacity: 1, color: efColor(props.ef) });
   layer.bringToFront();
   activeFeature = layer;
 
   showMapPopup(props, getLayerCenter(layer));
   showDetailPanel(props);
 
-  if (window.innerWidth <= 800) {
-    document.getElementById('sidebar').classList.add('open');
-  }
+  if (window.innerWidth <= 800) document.getElementById('sidebar').classList.add('open');
 }
 
 // ---------------------------------------------------------------
-//  MAP POPUP
+//  POPUP
 // ---------------------------------------------------------------
 function showMapPopup(props, latlng) {
   var ef   = efInfo(props.ef);
   var date = formatDate(props.date);
+  var isOutbreak = outbreakDates[props.date] ? ' &#128680; Outbreak day' : '';
 
   var html =
     '<div class="tornado-popup">' +
       '<div class="tp-header">' +
         '<div>' +
           '<div class="tp-title">' + escHtml(props.location) + ', ' + escHtml(props.state) + '</div>' +
-          '<div class="tp-date">&#128197; ' + date + ' &middot; ' + escHtml(props.time) + ' local</div>' +
+          '<div class="tp-date">&#128197; ' + date + ' &middot; ' + escHtml(props.time) + isOutbreak + '</div>' +
         '</div>' +
         '<div class="tp-ef-pill" style="background:' + ef.color + '22;color:' + ef.color + ';border:1px solid ' + ef.color + '55;">' + ef.label + '</div>' +
       '</div>' +
@@ -1328,28 +827,23 @@ function showMapPopup(props, latlng) {
       '<div class="tp-footer">&#8505;&#65039; Full details in the left panel</div>' +
     '</div>';
 
-  L.popup({ maxWidth: 300 })
-    .setLatLng(latlng)
-    .setContent(html)
-    .openOn(map);
+  L.popup({ maxWidth: 300 }).setLatLng(latlng).setContent(html).openOn(map);
 }
 
 // ---------------------------------------------------------------
-//  SIDEBAR DETAIL PANEL
+//  DETAIL PANEL
 // ---------------------------------------------------------------
 function showDetailPanel(props) {
   var ef   = efInfo(props.ef);
   var date = formatDate(props.date);
-
   document.getElementById('detail-placeholder').style.display = 'none';
   var card = document.getElementById('detail-card');
   card.style.display = 'flex';
-
   card.innerHTML =
     '<div class="detail-header">' +
       '<div>' +
         '<div class="detail-title">' + escHtml(props.location) + '</div>' +
-        '<div class="detail-subtitle">&#128205; ' + escHtml(props.state) + ' &middot; ' + date + ' &middot; ' + escHtml(props.time) + '</div>' +
+        '<div class="detail-subtitle">&#128205; ' + escHtml(props.state) + ' &middot; ' + date + ' &middot; ' + escHtml(props.time) + (outbreakDates[props.date] ? ' &#128680;' : '') + '</div>' +
       '</div>' +
       '<div class="detail-ef-badge" style="background:' + ef.color + '22;color:' + ef.color + ';border:1px solid ' + ef.color + '55;">' + ef.label + '</div>' +
     '</div>' +
@@ -1363,9 +857,7 @@ function showDetailPanel(props) {
       '<div class="detail-stat"><div class="detail-stat-label">Wind Speed</div><div class="detail-stat-value">' + ef.desc + '</div></div>' +
     '</div>' +
     '<div class="detail-divider"></div>' +
-    '<div style="font-size:0.72rem;color:var(--text-dim);line-height:1.6;">' +
-      '<strong style="color:var(--text-muted)">Note:</strong> EF scale ratings represent estimated maximum wind speeds along the path. Actual damage may vary by segment.' +
-    '</div>';
+    '<div style="font-size:0.72rem;color:var(--text-dim);line-height:1.6;"><strong style="color:var(--text-muted)">Note:</strong> EF scale ratings represent estimated maximum wind speeds. Actual damage may vary.</div>';
 }
 
 function hideDetailPanel() {
@@ -1374,67 +866,155 @@ function hideDetailPanel() {
 }
 
 // ---------------------------------------------------------------
-//  FILTERING
+//  FILTERING — year, month, day, state, EF, casualty
 // ---------------------------------------------------------------
 function applyFilters() {
   if (!tornadoLayer) return;
 
   var visibleCount    = 0;
   var totalFatalities = 0;
+  var efCounts        = {0:0, 1:0, 2:0, 3:0, 4:0, 5:0};
+  var visibleLayers   = [];
 
   tornadoLayer.eachLayer(function(layer) {
-    var props = layer.feature.properties;
-    var date  = new Date(props.date + 'T00:00:00');
-    var month = date.getMonth() + 1;
-    var day   = date.getDate();
+    var props   = layer.feature.properties;
+    var dateParts = (props.date || '').split('-');
+    var yr  = parseInt(dateParts[0], 10);
+    var mo  = parseInt(dateParts[1], 10);
+    var dy  = parseInt(dateParts[2], 10);
+    var cas = (props.fat || 0) + (props.injuries || 0);
 
-    var monthOK = filterMonth === 'all' || month === parseInt(filterMonth, 10);
-    var dayOK   = filterDay === 0       || day   === filterDay;
-    var efOK    = filterEF  === -1      || props.ef >= filterEF;
+    var yearOK  = yr >= filterYearMin && yr <= filterYearMax;
+    var monthOK = filterMonth === 'all' || mo === parseInt(filterMonth, 10);
+    var dayOK   = filterDay === 0       || dy === filterDay;
+    var stateOK = filterState === 'all' || props.state === filterState;
+    var efOK    = filterEF === -1       || props.ef >= filterEF;
+    var casOK   = filterCasualty === 0  || cas >= filterCasualty;
 
-    if (monthOK && dayOK && efOK) {
-      layer.setStyle({ opacity: CONFIG.trackOpacity, weight: CONFIG.trackWeight });
+    if (yearOK && monthOK && dayOK && stateOK && efOK && casOK) {
+      layer.setStyle({ opacity: CONFIG.trackOpacity, weight: trackWeight(props.width_yd) });
       visibleCount++;
       totalFatalities += (props.fat || 0);
+      efCounts[props.ef] = (efCounts[props.ef] || 0) + 1;
+      visibleLayers.push(layer);
     } else {
       layer.setStyle({ opacity: 0, weight: 0 });
     }
   });
 
+  // No results notice
   document.getElementById('no-results').style.display = visibleCount === 0 ? 'block' : 'none';
 
-  // Reset selection if it was filtered out
+  // Reset selection if filtered out
   if (activeFeature) {
-    var p = activeFeature.feature.properties;
-    var d = new Date(p.date + 'T00:00:00');
-    var m = d.getMonth() + 1;
-    var dy = d.getDate();
-    var mOK  = filterMonth === 'all' || m  === parseInt(filterMonth, 10);
-    var dOK  = filterDay   === 0     || dy === filterDay;
-    var eOK  = filterEF    === -1    || p.ef >= filterEF;
-
-    if (!mOK || !dOK || !eOK) {
-      map.closePopup();
-      hideDetailPanel();
-      activeFeature = null;
-    }
+    var p  = activeFeature.feature.properties;
+    var dp = (p.date || '').split('-');
+    var yr2  = parseInt(dp[0], 10);
+    var mo2  = parseInt(dp[1], 10);
+    var dy2  = parseInt(dp[2], 10);
+    var cas2 = (p.fat || 0) + (p.injuries || 0);
+    var pass = yr2 >= filterYearMin && yr2 <= filterYearMax &&
+               (filterMonth === 'all' || mo2 === parseInt(filterMonth, 10)) &&
+               (filterDay === 0 || dy2 === filterDay) &&
+               (filterState === 'all' || p.state === filterState) &&
+               (filterEF === -1 || p.ef >= filterEF) &&
+               (filterCasualty === 0 || cas2 >= filterCasualty);
+    if (!pass) { map.closePopup(); hideDetailPanel(); activeFeature = null; }
   }
 
+  // Outbreak detection
+  markOutbreaks(visibleLayers);
+
+  // Update stats
   document.getElementById('stat-visible').textContent    = visibleCount;
   document.getElementById('stat-fatalities').textContent = totalFatalities;
+
+  // Update chart
+  updateEFChart(efCounts, visibleCount);
 }
 
-function updateStats() {
-  var visible    = 0;
-  var fatalities = 0;
-  if (tornadoLayer) {
-    tornadoLayer.eachLayer(function(l) {
-      visible++;
-      fatalities += (l.feature.properties.fat || 0);
-    });
+// ---------------------------------------------------------------
+//  OUTBREAK HIGHLIGHTER
+// ---------------------------------------------------------------
+function markOutbreaks(visibleLayers) {
+  // Count tornadoes per date
+  var dateCounts = {};
+  visibleLayers.forEach(function(l) {
+    var d = l.feature.properties.date;
+    dateCounts[d] = (dateCounts[d] || 0) + 1;
+  });
+
+  // Build outbreak set
+  outbreakDates = {};
+  var outbreakCount = 0;
+  Object.keys(dateCounts).forEach(function(d) {
+    if (dateCounts[d] >= CONFIG.outbreakThreshold) {
+      outbreakDates[d] = true;
+      outbreakCount++;
+    }
+  });
+
+  // Apply/remove CSS class on each layer
+  visibleLayers.forEach(function(l) {
+    var el = l.getElement ? l.getElement() : null;
+    if (!el) return;
+    var isOutbreak = outbreakDates[l.feature.properties.date];
+    if (isOutbreak) {
+      el.classList.add('outbreak-track');
+    } else {
+      el.classList.remove('outbreak-track');
+    }
+  });
+
+  // Update header badge
+  var pill = document.getElementById('pill-outbreaks');
+  var cnt  = document.getElementById('stat-outbreaks');
+  if (outbreakCount > 0) {
+    pill.classList.add('visible');
+    cnt.textContent = outbreakCount;
+  } else {
+    pill.classList.remove('visible');
   }
-  document.getElementById('stat-visible').textContent    = visible;
-  document.getElementById('stat-fatalities').textContent = fatalities;
+}
+
+// ---------------------------------------------------------------
+//  FIT TO FILTER
+// ---------------------------------------------------------------
+function fitVisibleBounds() {
+  if (!tornadoLayer) return;
+  var bounds = null;
+  tornadoLayer.eachLayer(function(layer) {
+    if (layer.options.opacity > 0) {
+      var lb = layer.getBounds ? layer.getBounds() : null;
+      if (lb) { bounds = bounds ? bounds.extend(lb) : lb; }
+    }
+  });
+  if (bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.08));
+}
+
+// ---------------------------------------------------------------
+//  JUMP TO DEADLIEST VISIBLE TORNADO
+// ---------------------------------------------------------------
+function jumpToDeadliest() {
+  if (!tornadoLayer) return;
+  var best = null, bestFat = -1;
+  tornadoLayer.eachLayer(function(layer) {
+    if (layer.options.opacity > 0) {
+      var f = layer.feature.properties.fat || 0;
+      if (f > bestFat) { bestFat = f; best = layer; }
+    }
+  });
+  if (!best) return;
+
+  if (activeFeature && activeFeature !== best) tornadoLayer.resetStyle(activeFeature);
+  best.setStyle({ weight: CONFIG.trackWeightHover + 2, opacity: 1, color: efColor(best.feature.properties.ef) });
+  best.bringToFront();
+  activeFeature = best;
+
+  var center = getLayerCenter(best);
+  map.setView(center, 8, { animate: true });
+  showMapPopup(best.feature.properties, center);
+  showDetailPanel(best.feature.properties);
 }
 
 // ---------------------------------------------------------------
@@ -1447,7 +1027,7 @@ function getLayerCenter(layer) {
 }
 
 function formatDate(dateStr) {
-  var d = new Date(dateStr + 'T00:00:00');
+  var d = new Date((dateStr || '') + 'T00:00:00');
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
@@ -1457,125 +1037,38 @@ function escHtml(str) {
   return div.innerHTML;
 }
 
-function hideLoader() {
-  document.getElementById('loading-overlay').classList.add('hidden');
-}
-
-// ---------------------------------------------------------------
-//  UI BINDINGS
-// ---------------------------------------------------------------
-function bindUI() {
-  document.getElementById('filter-month').addEventListener('change', function(e) {
-    filterMonth = e.target.value;
-  });
-
-  var daySlider = document.getElementById('filter-day');
-  var dayBadge  = document.getElementById('day-badge');
-
-  daySlider.addEventListener('input', function(e) {
-    filterDay = parseInt(e.target.value, 10);
-    dayBadge.textContent = filterDay === 0 ? 'All' : 'Day ' + filterDay;
-    var pct = (filterDay / 31) * 100;
-    daySlider.style.setProperty('--fill', pct + '%');
-  });
-
-  document.getElementById('filter-ef').addEventListener('change', function(e) {
-    filterEF = parseInt(e.target.value, 10);
-  });
-
-  document.getElementById('btn-apply').addEventListener('click', function() {
-    applyFilters();
-    var btn = document.getElementById('btn-apply');
-    btn.textContent = '\u2713 Applied!';
-    setTimeout(function() { btn.innerHTML = '&#9889; Apply Filters'; }, 1200);
-  });
-
-  document.getElementById('btn-reset').addEventListener('click', function() {
-    filterMonth = 'all';
-    filterDay   = 0;
-    filterEF    = -1;
-
-    document.getElementById('filter-month').value = 'all';
-    document.getElementById('filter-day').value   = '0';
-    document.getElementById('filter-ef').value    = '-1';
-    dayBadge.textContent = 'All';
-    daySlider.style.setProperty('--fill', '0%');
-
-    applyFilters();
-    map.closePopup();
-    hideDetailPanel();
-    activeFeature = null;
-  });
-
-  document.getElementById('sidebar-toggle').addEventListener('click', function() {
-    document.getElementById('sidebar').classList.toggle('open');
-  });
-
-  map.on('click', function() {
-    if (window.innerWidth <= 800) {
-      document.getElementById('sidebar').classList.remove('open');
-    }
-  });
-
-  map.on('popupclose', function() {
-    if (activeFeature) {
-      tornadoLayer.resetStyle(activeFeature);
-      activeFeature = null;
-      hideDetailPanel();
-    }
-  });
-}
-
-// ---------------------------------------------------------------
-//  DATA FETCHING — localStorage cache + auto-fetch
-// ---------------------------------------------------------------
-
-// Path to the GeoJSON file generated by GitHub Actions.
-// When deployed to yorkdevelops.com, this resolves to the same directory
-// as index.html. You can also use an absolute URL, e.g.:
-//   var GEOJSON_URL = 'https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/tornadoes.geojson';
-var GEOJSON_URL   = './tornadoes.geojson';
-
-var CACHE_KEY     = 'tornadotracker_geojson_v1';
-var CACHE_TS_KEY  = 'tornadotracker_geojson_ts_v1';
-var CACHE_TTL_MS  = 6 * 60 * 60 * 1000;   // 6 hours — matches weekly update cadence
+function hideLoader() { document.getElementById('loading-overlay').classList.add('hidden'); }
 
 function setLoadingText(msg, sub) {
-  var el = document.getElementById('loading-text');
-  var se = document.getElementById('loading-source');
-  if (el) el.textContent = msg;
-  if (se) se.textContent = sub || '';
+  var el = document.getElementById('loading-text'), se = document.getElementById('loading-source');
+  if (el) el.textContent = msg; if (se) se.textContent = sub || '';
 }
 
 function showUpdatedTimestamp(isoStr) {
   var el = document.getElementById('stat-updated');
   if (!el) return;
-  if (!isoStr) { el.textContent = '--'; return; }
   try {
     var d = new Date(isoStr);
     el.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-    document.getElementById('pill-updated').title =
-      'Data generated: ' + d.toUTCString() + '\nCache TTL: 6 hours';
-  } catch(e) {
-    el.textContent = 'recent';
-  }
+  } catch(e) { el.textContent = 'recent'; }
 }
+
+// ---------------------------------------------------------------
+//  CACHE
+// ---------------------------------------------------------------
+var GEOJSON_URL  = './tornadoes.geojson';
+var CACHE_KEY    = 'tornadotracker_geojson_v1';
+var CACHE_TS_KEY = 'tornadotracker_geojson_ts_v1';
+var CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 function loadFromCache() {
   try {
-    var ts  = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
-    var age = Date.now() - ts;
-    if (age < CACHE_TTL_MS) {
+    var ts = parseInt(localStorage.getItem(CACHE_TS_KEY) || '0', 10);
+    if (Date.now() - ts < CACHE_TTL_MS) {
       var raw = localStorage.getItem(CACHE_KEY);
-      if (raw) {
-        var data = JSON.parse(raw);
-        console.log('[TornadoTracker] Serving from cache (' + Math.round(age / 60000) + ' min old)');
-        return data;
-      }
+      if (raw) return JSON.parse(raw);
     }
-  } catch(e) {
-    console.warn('[TornadoTracker] Cache read failed:', e);
-  }
+  } catch(e) {}
   return null;
 }
 
@@ -1583,73 +1076,166 @@ function saveToCache(data) {
   try {
     localStorage.setItem(CACHE_KEY,    JSON.stringify(data));
     localStorage.setItem(CACHE_TS_KEY, String(Date.now()));
-  } catch(e) {
-    // Storage quota exceeded — silently skip caching
-    console.warn('[TornadoTracker] Cache write failed (quota?):', e);
-  }
-}
-
-function clearCache() {
-  try {
-    localStorage.removeItem(CACHE_KEY);
-    localStorage.removeItem(CACHE_TS_KEY);
   } catch(e) {}
 }
 
+function clearCache() {
+  try { localStorage.removeItem(CACHE_KEY); localStorage.removeItem(CACHE_TS_KEY); } catch(e) {}
+}
+
 function fetchGeoJSON(forceRefresh) {
-  // 1. Try cache first (unless forced refresh)
   if (!forceRefresh) {
     var cached = loadFromCache();
-    if (cached) {
-      renderData(cached, 'cache');
-      return;
-    }
+    if (cached) { renderData(cached, 'cache'); return; }
   }
-
-  // 2. Fetch from server
-  setLoadingText('Fetching latest tornado data…', GEOJSON_URL);
-  console.log('[TornadoTracker] Fetching:', GEOJSON_URL);
-
+  setLoadingText('Fetching latest tornado data\u2026', GEOJSON_URL);
   fetch(GEOJSON_URL)
-    .then(function(resp) {
-      if (!resp.ok) throw new Error('HTTP ' + resp.status);
-      return resp.json();
-    })
-    .then(function(data) {
-      saveToCache(data);
-      renderData(data, 'network');
-    })
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function(data) { saveToCache(data); renderData(data, 'network'); })
     .catch(function(err) {
-      console.warn('[TornadoTracker] Fetch failed (' + err.message + ') — falling back to built-in sample data.');
-      setLoadingText('Using sample data…', 'tornadoes.geojson not found — run GitHub Action to generate it');
+      console.warn('[TornadoTracker] Fetch failed (' + err.message + ') \u2014 using sample data.');
+      setLoadingText('Using sample data\u2026', 'Run GitHub Action to generate tornadoes.geojson');
       setTimeout(function() { renderData(TORNADO_GEOJSON, 'fallback'); }, 600);
     });
 }
 
 function renderData(data, source) {
-  // Remove old layer if this is a refresh
-  if (tornadoLayer) {
-    map.removeLayer(tornadoLayer);
-    tornadoLayer  = null;
-    activeFeature = null;
-    hideDetailPanel();
-    map.closePopup();
-  }
-
+  if (tornadoLayer) { map.removeLayer(tornadoLayer); tornadoLayer = null; activeFeature = null; hideDetailPanel(); map.closePopup(); }
   initTornadoLayer(data);
   hideLoader();
-
-  // Show generated timestamp from metadata (GitHub Actions sets this)
   var generated = (data.metadata && data.metadata.generated) ? data.metadata.generated : null;
   showUpdatedTimestamp(generated || new Date().toISOString());
+  if (source === 'fallback') document.getElementById('stat-updated').textContent = 'sample';
+}
 
-  if (source === 'fallback') {
-    document.getElementById('stat-updated').textContent = 'sample';
-  }
+// ---------------------------------------------------------------
+//  UI BINDINGS
+// ---------------------------------------------------------------
+function bindUI() {
+  // Year range sliders
+  var slMin = document.getElementById('filter-year-min');
+  var slMax = document.getElementById('filter-year-max');
 
-  setTimeout(function() {
-    if (tornadoLayer) map.fitBounds(tornadoLayer.getBounds().pad(0.1));
-  }, 300);
+  slMin.addEventListener('input', function() {
+    filterYearMin = parseInt(slMin.value, 10);
+    if (filterYearMin > filterYearMax) { filterYearMax = filterYearMin; slMax.value = filterYearMin; }
+    updateYearFill();
+  });
+  slMax.addEventListener('input', function() {
+    filterYearMax = parseInt(slMax.value, 10);
+    if (filterYearMax < filterYearMin) { filterYearMin = filterYearMax; slMin.value = filterYearMax; }
+    updateYearFill();
+  });
+
+  // Month
+  document.getElementById('filter-month').addEventListener('change', function(e) { filterMonth = e.target.value; });
+
+  // Day
+  var daySlider = document.getElementById('filter-day');
+  var dayBadge  = document.getElementById('day-badge');
+  daySlider.addEventListener('input', function(e) {
+    filterDay = parseInt(e.target.value, 10);
+    dayBadge.textContent = filterDay === 0 ? 'All' : 'Day ' + filterDay;
+    var pct = (filterDay / 31) * 100;
+    daySlider.style.setProperty('--fill', pct + '%');
+  });
+
+  // State
+  document.getElementById('filter-state').addEventListener('change', function(e) { filterState = e.target.value; });
+
+  // EF
+  document.getElementById('filter-ef').addEventListener('change', function(e) { filterEF = parseInt(e.target.value, 10); });
+
+  // Casualty
+  var casSlider = document.getElementById('filter-casualty');
+  var casBadge  = document.getElementById('casualty-badge');
+  casSlider.addEventListener('input', function(e) {
+    filterCasualty = parseInt(e.target.value, 10);
+    casBadge.textContent = filterCasualty === 0 ? 'Any' : '>= ' + filterCasualty;
+    var pct = (filterCasualty / 50) * 100;
+    casSlider.style.setProperty('--fill', pct + '%');
+  });
+
+  // Apply
+  document.getElementById('btn-apply').addEventListener('click', function() {
+    applyFilters();
+    var btn = document.getElementById('btn-apply');
+    btn.textContent = '\u2713 Applied!';
+    setTimeout(function() { btn.innerHTML = '&#9889; Apply'; }, 1200);
+  });
+
+  // Fit to filter
+  document.getElementById('btn-fit').addEventListener('click', fitVisibleBounds);
+
+  // Reset
+  document.getElementById('btn-reset').addEventListener('click', function() {
+    filterMonth = 'all'; filterDay = 0; filterEF = -1;
+    filterYearMin = dataYearMin; filterYearMax = dataYearMax;
+    filterState = 'all'; filterCasualty = 0;
+
+    document.getElementById('filter-month').value    = 'all';
+    document.getElementById('filter-day').value      = '0';
+    document.getElementById('filter-ef').value       = '-1';
+    document.getElementById('filter-state').value    = 'all';
+    document.getElementById('filter-casualty').value = '0';
+    document.getElementById('filter-year-min').value = dataYearMin;
+    document.getElementById('filter-year-max').value = dataYearMax;
+
+    dayBadge.textContent = 'All';
+    casBadge.textContent = 'Any';
+    daySlider.style.setProperty('--fill', '0%');
+    casSlider.style.setProperty('--fill', '0%');
+    updateYearFill();
+
+    applyFilters();
+    map.closePopup();
+    hideDetailPanel();
+    activeFeature = null;
+
+    setTimeout(function() {
+      if (tornadoLayer) map.fitBounds(tornadoLayer.getBounds().pad(0.08));
+    }, 100);
+  });
+
+  // Refresh button
+  document.getElementById('btn-refresh').addEventListener('click', function() {
+    var btn = document.getElementById('btn-refresh');
+    btn.classList.add('spinning');
+    clearCache();
+    document.getElementById('loading-overlay').classList.remove('hidden');
+    setLoadingText('Refreshing data\u2026', '');
+    setTimeout(function() {
+      fetchGeoJSON(true);
+      setTimeout(function() { btn.classList.remove('spinning'); }, 1500);
+    }, 200);
+  });
+
+  // Interactive stat pills
+  document.getElementById('pill-total').addEventListener('click', fitVisibleBounds);
+  document.getElementById('pill-fatal').addEventListener('click', jumpToDeadliest);
+  document.getElementById('pill-outbreaks').addEventListener('click', function() {
+    // Fit bounds to outbreak tracks only
+    if (!tornadoLayer) return;
+    var bounds = null;
+    tornadoLayer.eachLayer(function(l) {
+      if (l.options.opacity > 0 && outbreakDates[l.feature.properties.date]) {
+        var lb = l.getBounds ? l.getBounds() : null;
+        if (lb) { bounds = bounds ? bounds.extend(lb) : lb; }
+      }
+    });
+    if (bounds && bounds.isValid()) map.fitBounds(bounds.pad(0.08));
+  });
+
+  // Mobile sidebar
+  document.getElementById('sidebar-toggle').addEventListener('click', function() {
+    document.getElementById('sidebar').classList.toggle('open');
+  });
+  map.on('click', function() {
+    if (window.innerWidth <= 800) document.getElementById('sidebar').classList.remove('open');
+  });
+  map.on('popupclose', function() {
+    if (activeFeature) { tornadoLayer.resetStyle(activeFeature); activeFeature = null; hideDetailPanel(); }
+  });
 }
 
 // ---------------------------------------------------------------
@@ -1658,24 +1244,7 @@ function renderData(data, source) {
 window.addEventListener('DOMContentLoaded', function() {
   buildLegend();
   bindUI();
-
-  // Refresh button — clears cache and re-fetches immediately
-  document.getElementById('btn-refresh').addEventListener('click', function() {
-    var btn = document.getElementById('btn-refresh');
-    btn.classList.add('spinning');
-    clearCache();
-    document.getElementById('loading-overlay').classList.remove('hidden');
-    setLoadingText('Refreshing data…', '');
-    setTimeout(function() {
-      fetchGeoJSON(true);
-      setTimeout(function() { btn.classList.remove('spinning'); }, 1500);
-    }, 200);
-  });
-
-  // Small delay so the map tiles start loading before we parse JSON
-  setTimeout(function() {
-    fetchGeoJSON(false);
-  }, 400);
+  setTimeout(function() { fetchGeoJSON(false); }, 400);
 });
 </script>
 </body>
