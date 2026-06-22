@@ -2,25 +2,40 @@
 #  TornadoTracker — Automated Data Pipeline
 #  .github/workflows/fetch-tornado-data.yml
 #
-#  What it does:
-#    1. Runs on a weekly cron schedule (every Monday 06:00 UTC)
-#    2. Can also be triggered manually from the Actions tab
-#    3. Runs scripts/fetch_tornadoes.py to pull the NOAA SPC
-#       tornado CSV and convert it to tornadoes.geojson
-#    4. Commits & pushes the updated GeoJSON back to the repo
-#    5. If nothing changed, no commit is made (idempotent)
+#  SCHEDULE OVERVIEW
+#  ─────────────────────────────────────────────────────────
+#  Weekly  (every Monday 06:00 UTC)
+#    → Fetches the NOAA NCEI Storm Events .csv.gz for the
+#      current calendar year, which NCEI updates monthly.
+#      Keeps the "recent" data (~2-month lag) fresh year-round.
 #
-#  No API keys or secrets required — NOAA data is public.
+#  Annual  (April 15 each year, 06:00 UTC)
+#    → Fetches the new NOAA SPC historical CSV that NOAA
+#      typically releases each spring for the prior year.
+#      Adds the fully-verified, high-quality historical dataset.
+#
+#  Manual  (workflow_dispatch from the Actions tab)
+#    → Runs the full pipeline on demand with optional
+#      START_YEAR override.
+#
+#  No API keys required — all NOAA data is public.
+#  No pip dependencies — script uses Python stdlib only.
 # ============================================================
 
 name: Fetch Tornado Data
 
 on:
-  # ── Scheduled run — every Monday at 06:00 UTC ──────────────
   schedule:
+    # ── Weekly run: every Monday 06:00 UTC ─────────────────
+    # Picks up new NOAA NCEI monthly drops for the current year
     - cron: "0 6 * * 1"
 
-  # ── Manual trigger from the GitHub Actions UI ──────────────
+    # ── Annual run: April 15 06:00 UTC ─────────────────────
+    # Picks up new NOAA SPC historical CSV (prior-year data
+    # typically released by NOAA in March–April)
+    - cron: "0 6 15 4 *"
+
+  # ── Manual trigger from the GitHub Actions UI ────────────
   workflow_dispatch:
     inputs:
       start_year:
@@ -30,38 +45,36 @@ on:
 
 jobs:
   fetch-and-commit:
-    name: Fetch NOAA SPC data → tornadoes.geojson
+    name: "Fetch NOAA SPC + NCEI → tornadoes.geojson"
     runs-on: ubuntu-latest
 
     permissions:
-      contents: write   # needed to push the updated GeoJSON
+      contents: write   # required to push the updated GeoJSON back to the repo
 
     steps:
       # ── 1. Check out the repo ─────────────────────────────
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1   # shallow clone is enough
+          fetch-depth: 1   # shallow clone — we only need the latest commit
 
       # ── 2. Set up Python ──────────────────────────────────
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          # No cache: pip — script has no pip dependencies (stdlib only)
 
       # ── 3. Override START_YEAR if manually dispatched ─────
       - name: Apply manual year override (if dispatched)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.start_year != ''
         run: |
           YEAR="${{ github.event.inputs.start_year }}"
-          if [ -n "$YEAR" ]; then
-            # Patch the constant in the script inline
-            sed -i "s/^START_YEAR = .*/START_YEAR = ${YEAR}/" scripts/fetch_tornadoes.py
-            echo "START_YEAR overridden to ${YEAR}"
-          fi
+          echo "START_YEAR override requested: ${YEAR}"
+          echo "START_YEAR=${YEAR}" >> "$GITHUB_ENV"
 
-      # ── 4. Run the fetch + conversion script ──────────────
-      - name: Fetch NOAA SPC CSV and convert to GeoJSON
+      # ── 4. Run the dual-source fetch + conversion script ──
+      - name: Fetch NOAA SPC + NCEI data and convert to GeoJSON
         run: python scripts/fetch_tornadoes.py
 
       # ── 5. Commit the result (only if the file changed) ───
@@ -72,13 +85,15 @@ jobs:
 
           git add tornadoes.geojson
 
-          # Only commit if there's actually a diff
+          # Only commit when there is a real diff (idempotent)
           if git diff --staged --quiet; then
             echo "No changes detected — tornadoes.geojson is already up to date."
           else
+            TOTAL=$(python -c "import json; d=json.load(open('tornadoes.geojson')); print(d['metadata']['record_count'])")
+            SPC_THROUGH=$(python -c "import json; d=json.load(open('tornadoes.geojson')); print(d['metadata']['spc_through'])")
+            NCEI_THROUGH=$(python -c "import json; d=json.load(open('tornadoes.geojson')); print(d['metadata']['ncei_through'])")
             TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M UTC')
-            RECORDS=$(python -c "import json; d=json.load(open('tornadoes.geojson')); print(d['metadata']['record_count'])")
-            git commit -m "chore(data): auto-update tornado data [${TIMESTAMP}] — ${RECORDS} records"
+            git commit -m "data: update tornadoes.geojson [${TIMESTAMP}] — ${TOTAL} records (SPC ≤${SPC_THROUGH} + NCEI ≤${NCEI_THROUGH})"
             git push
-            echo "Pushed updated tornadoes.geojson (${RECORDS} records)"
+            echo "Pushed tornadoes.geojson: ${TOTAL} records (SPC ≤${SPC_THROUGH}, NCEI ≤${NCEI_THROUGH})"
           fi

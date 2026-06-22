@@ -378,8 +378,9 @@
         <span class="dot-outbreak"></span>
         <span>Outbreaks: <strong id="stat-outbreaks">0</strong></span>
       </div>
-      <div class="stat-pill" id="pill-updated" title="Data auto-refreshes every Monday via GitHub Actions">
-        <span>Updated: <strong id="stat-updated">--</strong></span>
+      <div class="stat-pill" id="pill-updated"
+           title="SPC historical data: refreshed each April when NOAA releases the prior year&#10;NCEI current-year data: updated weekly (NCEI publishes monthly, ~2-month lag)">
+        <span>Data: <strong id="stat-updated">--</strong></span>
       </div>
       <button id="btn-refresh" title="Force refresh data from server" aria-label="Refresh tornado data">&#8635;</button>
     </div>
@@ -1060,13 +1061,40 @@ function setLoadingText(msg, sub) {
   if (el) el.textContent = msg; if (se) se.textContent = sub || '';
 }
 
-function showUpdatedTimestamp(isoStr) {
-  var el = document.getElementById('stat-updated');
+function showDataCoverage(metadata) {
+  var el   = document.getElementById('stat-updated');
+  var pill = document.getElementById('pill-updated');
   if (!el) return;
-  try {
-    var d = new Date(isoStr);
-    el.textContent = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-  } catch(e) { el.textContent = 'recent'; }
+
+  var spcThrough  = (metadata && metadata.spc_through)  || '';
+  var nceiThrough = (metadata && metadata.ncei_through) || spcThrough;
+  var generated   = (metadata && metadata.generated)    || '';
+
+  // Coverage label: e.g. "1950–2026" or just year if same
+  if (nceiThrough && nceiThrough !== spcThrough) {
+    el.textContent = '1950\u2013' + nceiThrough;
+  } else if (spcThrough) {
+    el.textContent = '1950\u2013' + spcThrough;
+  } else {
+    try {
+      el.textContent = new Date(generated).getFullYear();
+    } catch(e) { el.textContent = 'recent'; }
+  }
+
+  // Rich tooltip
+  if (pill) {
+    var genStr = '';
+    try {
+      genStr = new Date(generated).toLocaleDateString('en-US',
+        { month: 'short', day: 'numeric', year: 'numeric' });
+    } catch(e) {}
+    var tip = 'SPC historical through ' + (spcThrough || '?') + ' \u2014 refreshed each April';
+    if (nceiThrough && nceiThrough !== spcThrough) {
+      tip += '\nNCEI ' + (parseInt(spcThrough, 10) + 1) + '\u2013' + nceiThrough + ' \u2014 updated weekly';
+    }
+    if (genStr) tip += '\nLast generated: ' + genStr;
+    pill.title = tip;
+  }
 }
 
 // ---------------------------------------------------------------
@@ -1119,9 +1147,11 @@ function renderData(data, source) {
   if (tornadoLayer) { map.removeLayer(tornadoLayer); tornadoLayer = null; activeFeature = null; hideDetailPanel(); map.closePopup(); }
   initTornadoLayer(data);
   hideLoader();
-  var generated = (data.metadata && data.metadata.generated) ? data.metadata.generated : null;
-  showUpdatedTimestamp(generated || new Date().toISOString());
-  if (source === 'fallback') document.getElementById('stat-updated').textContent = 'sample';
+  if (source === 'fallback') {
+    document.getElementById('stat-updated').textContent = 'sample';
+  } else {
+    showDataCoverage(data.metadata || {});
+  }
 }
 
 // ---------------------------------------------------------------
