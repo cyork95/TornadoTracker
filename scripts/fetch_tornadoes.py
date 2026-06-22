@@ -32,6 +32,7 @@ from io import StringIO
 # Primary and fallback CSV URLs (NOAA updates the filename each year)
 # The script tries each URL in order until one succeeds.
 CSV_URLS = [
+    "https://www.spc.noaa.gov/wcm/data/1950-2025_actual_tornadoes.csv",
     "https://www.spc.noaa.gov/wcm/data/1950-2024_actual_tornadoes.csv",
     "https://www.spc.noaa.gov/wcm/data/1950-2023_actual_tornadoes.csv",
     "https://www.spc.noaa.gov/wcm/data/1950-2022_actual_tornadoes.csv",

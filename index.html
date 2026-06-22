@@ -106,11 +106,15 @@
     #sidebar {
       width: 310px; min-width: 310px; background: rgba(7, 11, 20, 0.96);
       border-right: 1px solid var(--border-subtle); display: flex; flex-direction: column;
-      overflow-y: auto; z-index: 900; backdrop-filter: blur(16px); flex-shrink: 0;
+      overflow: hidden; z-index: 900; backdrop-filter: blur(16px); flex-shrink: 0;
+    }
+    /* Top zone — filters / legend / chart — scrolls independently */
+    #sidebar-top {
+      flex: 1; overflow-y: auto; min-height: 0;
       scrollbar-width: thin; scrollbar-color: var(--border-subtle) transparent;
     }
-    #sidebar::-webkit-scrollbar { width: 4px; }
-    #sidebar::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
+    #sidebar-top::-webkit-scrollbar { width: 4px; }
+    #sidebar-top::-webkit-scrollbar-thumb { background: var(--border-subtle); border-radius: 4px; }
 
     @media (max-width: 800px) {
       #sidebar {
@@ -257,12 +261,19 @@
     }
     .outbreak-track path { animation: outbreak-pulse 1.8s ease-in-out infinite; }
 
-    /* ── Detail panel ── */
-    #detail-panel { flex:1; padding:16px; display:flex; flex-direction:column; overflow:hidden; }
-    #detail-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; text-align:center; gap:10px; color:var(--text-dim); }
-    #detail-placeholder .icon { font-size:2.5rem; opacity:0.3; }
-    #detail-placeholder p { font-size:0.78rem; line-height:1.5; max-width:200px; }
-    #detail-card { display:none; flex-direction:column; gap:12px; overflow-y:auto; flex:1; scrollbar-width:thin; scrollbar-color:var(--border-subtle) transparent; }
+    /* ── Detail panel — pinned at bottom of sidebar, always visible ── */
+    #detail-panel {
+      flex-shrink: 0;
+      height: 260px;
+      padding: 14px 16px;
+      display: flex; flex-direction: column;
+      border-top: 1px solid var(--border-subtle);
+      background: rgba(7,11,20,0.98);
+    }
+    #detail-placeholder { display:flex; flex-direction:column; align-items:center; justify-content:center; flex:1; text-align:center; gap:8px; color:var(--text-dim); }
+    #detail-placeholder .icon { font-size:2rem; opacity:0.3; }
+    #detail-placeholder p { font-size:0.75rem; line-height:1.5; max-width:200px; }
+    #detail-card { display:none; flex-direction:column; gap:10px; overflow-y:auto; flex:1; min-height:0; scrollbar-width:thin; scrollbar-color:var(--border-subtle) transparent; }
     #detail-card::-webkit-scrollbar { width:3px; }
     #detail-card::-webkit-scrollbar-thumb { background:var(--border-subtle); border-radius:3px; }
 
@@ -378,121 +389,126 @@
 
     <aside id="sidebar" role="complementary" aria-label="Tornado filter controls">
 
-      <!-- ── FILTERS ── -->
-      <div class="sidebar-section">
-        <p class="section-label">&#128269; Filters</p>
+      <!-- ── SCROLLABLE TOP: filters + legend + chart ── -->
+      <div id="sidebar-top">
 
-        <!-- Year range -->
-        <div class="filter-group">
-          <div class="filter-label">
-            Year Range
-            <span class="val-badge" id="year-badge">----</span>
+        <!-- ── FILTERS ── -->
+        <div class="sidebar-section">
+          <p class="section-label">&#128269; Filters</p>
+
+          <!-- Year range -->
+          <div class="filter-group">
+            <div class="filter-label">
+              Year Range
+              <span class="val-badge" id="year-badge">----</span>
+            </div>
+            <div class="year-range-wrap">
+              <div id="year-range-track"></div>
+              <div id="year-range-fill"></div>
+              <input type="range" id="filter-year-min" min="2000" max="2025" value="2000" step="1" aria-label="Minimum year" />
+              <input type="range" id="filter-year-max" min="2000" max="2025" value="2025" step="1" aria-label="Maximum year" />
+            </div>
+            <div class="slider-ticks">
+              <span id="year-tick-min">2000</span>
+              <span id="year-tick-max">2025</span>
+            </div>
           </div>
-          <div class="year-range-wrap">
-            <div id="year-range-track"></div>
-            <div id="year-range-fill"></div>
-            <input type="range" id="filter-year-min" min="2000" max="2024" value="2000" step="1" aria-label="Minimum year" />
-            <input type="range" id="filter-year-max" min="2000" max="2024" value="2024" step="1" aria-label="Maximum year" />
+
+          <!-- Month -->
+          <div class="filter-group">
+            <div class="filter-label">Month</div>
+            <div class="custom-select">
+              <select id="filter-month" aria-label="Filter by month">
+                <option value="all">All Months</option>
+                <option value="1">January</option><option value="2">February</option>
+                <option value="3">March</option><option value="4">April</option>
+                <option value="5">May</option><option value="6">June</option>
+                <option value="7">July</option><option value="8">August</option>
+                <option value="9">September</option><option value="10">October</option>
+                <option value="11">November</option><option value="12">December</option>
+              </select>
+            </div>
           </div>
-          <div class="slider-ticks" id="year-ticks">
-            <span id="year-tick-min">2000</span>
-            <span id="year-tick-max">2024</span>
+
+          <!-- Day -->
+          <div class="filter-group">
+            <div class="filter-label">
+              Day of Month
+              <span class="val-badge" id="day-badge">All</span>
+            </div>
+            <div class="slider-wrap">
+              <input type="range" id="filter-day" min="0" max="31" value="0" step="1" aria-label="Filter by day of month" />
+            </div>
+            <div class="slider-ticks">
+              <span>Any</span><span>8</span><span>15</span><span>23</span><span>31</span>
+            </div>
           </div>
+
+          <!-- State -->
+          <div class="filter-group">
+            <div class="filter-label">State</div>
+            <div class="custom-select">
+              <select id="filter-state" aria-label="Filter by state">
+                <option value="all">All States</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- EF scale -->
+          <div class="filter-group">
+            <div class="filter-label">Minimum EF Rating</div>
+            <div class="custom-select">
+              <select id="filter-ef" aria-label="Filter by minimum EF rating">
+                <option value="-1">All Ratings</option>
+                <option value="0">EF0+</option><option value="1">EF1+</option>
+                <option value="2">EF2+</option><option value="3">EF3+</option>
+                <option value="4">EF4+</option><option value="5">EF5 Only</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Casualty threshold -->
+          <div class="filter-group">
+            <div class="filter-label">
+              Min. Casualties (fat + inj)
+              <span class="val-badge" id="casualty-badge">Any</span>
+            </div>
+            <div class="slider-wrap">
+              <input type="range" id="filter-casualty" min="0" max="50" value="0" step="1" aria-label="Minimum casualty count" />
+            </div>
+            <div class="slider-ticks">
+              <span>0</span><span>12</span><span>25</span><span>37</span><span>50+</span>
+            </div>
+          </div>
+
+          <div class="btn-row">
+            <button id="btn-apply">&#9889; Apply</button>
+            <button id="btn-fit" title="Zoom map to filtered tracks">&#128205; Fit</button>
+          </div>
+          <button id="btn-reset">&#8634; Reset All Filters</button>
         </div>
 
-        <!-- Month -->
-        <div class="filter-group">
-          <div class="filter-label">Month</div>
-          <div class="custom-select">
-            <select id="filter-month" aria-label="Filter by month">
-              <option value="all">All Months</option>
-              <option value="1">January</option><option value="2">February</option>
-              <option value="3">March</option><option value="4">April</option>
-              <option value="5">May</option><option value="6">June</option>
-              <option value="7">July</option><option value="8">August</option>
-              <option value="9">September</option><option value="10">October</option>
-              <option value="11">November</option><option value="12">December</option>
-            </select>
-          </div>
+        <!-- ── EF LEGEND ── -->
+        <div class="sidebar-section">
+          <p class="section-label">&#127912; EF Scale</p>
+          <div class="legend-grid" id="ef-legend"></div>
+          <p style="font-size:0.62rem;color:var(--text-dim);margin-top:8px;line-height:1.4;">Track width scales with actual tornado path width (yards).</p>
         </div>
 
-        <!-- Day -->
-        <div class="filter-group">
-          <div class="filter-label">
-            Day of Month
-            <span class="val-badge" id="day-badge">All</span>
-          </div>
-          <div class="slider-wrap">
-            <input type="range" id="filter-day" min="0" max="31" value="0" step="1" aria-label="Filter by day of month" />
-          </div>
-          <div class="slider-ticks">
-            <span>Any</span><span>8</span><span>15</span><span>23</span><span>31</span>
-          </div>
+        <!-- ── EF BREAKDOWN CHART ── -->
+        <div class="sidebar-section">
+          <p class="section-label">&#128202; EF Breakdown</p>
+          <div id="ef-chart"></div>
         </div>
 
-        <!-- State -->
-        <div class="filter-group">
-          <div class="filter-label">State</div>
-          <div class="custom-select">
-            <select id="filter-state" aria-label="Filter by state">
-              <option value="all">All States</option>
-            </select>
-          </div>
-        </div>
+      </div><!-- /#sidebar-top -->
 
-        <!-- EF scale -->
-        <div class="filter-group">
-          <div class="filter-label">Minimum EF Rating</div>
-          <div class="custom-select">
-            <select id="filter-ef" aria-label="Filter by minimum EF rating">
-              <option value="-1">All Ratings</option>
-              <option value="0">EF0+</option><option value="1">EF1+</option>
-              <option value="2">EF2+</option><option value="3">EF3+</option>
-              <option value="4">EF4+</option><option value="5">EF5 Only</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- Casualty threshold -->
-        <div class="filter-group">
-          <div class="filter-label">
-            Min. Casualties (fat + inj)
-            <span class="val-badge" id="casualty-badge">Any</span>
-          </div>
-          <div class="slider-wrap">
-            <input type="range" id="filter-casualty" min="0" max="50" value="0" step="1" aria-label="Minimum casualty count" />
-          </div>
-          <div class="slider-ticks">
-            <span>0</span><span>12</span><span>25</span><span>37</span><span>50+</span>
-          </div>
-        </div>
-
-        <div class="btn-row">
-          <button id="btn-apply">&#9889; Apply</button>
-          <button id="btn-fit" title="Zoom map to filtered tracks">&#128205; Fit</button>
-        </div>
-        <button id="btn-reset">&#8634; Reset All Filters</button>
-      </div>
-
-      <!-- ── EF LEGEND ── -->
-      <div class="sidebar-section">
-        <p class="section-label">&#127912; EF Scale</p>
-        <div class="legend-grid" id="ef-legend"></div>
-        <p style="font-size:0.62rem;color:var(--text-dim);margin-top:8px;line-height:1.4;">Track width scales with actual tornado path width (yards).</p>
-      </div>
-
-      <!-- ── EF BREAKDOWN CHART ── -->
-      <div class="sidebar-section">
-        <p class="section-label">&#128202; EF Breakdown</p>
-        <div id="ef-chart"></div>
-      </div>
-
-      <!-- ── TRACK DETAIL ── -->
-      <div class="sidebar-section" id="detail-panel" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
-        <p class="section-label">&#128203; Track Detail</p>
+      <!-- ── TRACK DETAIL — always pinned at bottom ── -->
+      <div id="detail-panel">
+        <p class="section-label" style="margin-bottom:10px;">&#128203; Track Detail</p>
         <div id="detail-placeholder">
           <div class="icon">&#127786;</div>
-          <p>Click any tornado track on the map to see detailed information here.</p>
+          <p>Click any tornado track on the map to see details here.</p>
         </div>
         <div id="detail-card"></div>
       </div>
